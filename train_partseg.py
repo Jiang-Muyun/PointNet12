@@ -63,11 +63,23 @@ def main(args):
     logger.info('---------------------------------------------------TRANING---------------------------------------------------')
     logger.info('PARAMETER ...')
     logger.info(args)
+
     norm = True if args.model_name == 'pointnet' else False
-    TRAIN_DATASET = PartNormalDataset(npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
-    dataloader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=args.batchsize,shuffle=True, num_workers=int(args.workers))
-    TEST_DATASET = PartNormalDataset(npoints=2048, split='test',normalize=norm,jitter=False)
-    testdataloader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=10,shuffle=True, num_workers=int(args.workers))
+
+    if os.path.exists('/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0'):
+        root = '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0/'
+
+    if os.path.exists('/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0/'):
+        root = '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0/'
+
+    TRAIN_DATASET = PartNormalDataset(root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
+    dataloader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=args.batchsize,
+                                            shuffle=True, num_workers=int(args.workers))
+    
+    TEST_DATASET = PartNormalDataset(root,npoints=2048, split='test',normalize=norm,jitter=False)
+    testdataloader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=10, 
+                                                shuffle=True, num_workers=int(args.workers))
+    
     print("The number of training data is:",len(TRAIN_DATASET))
     logger.info("The number of training data is:%d",len(TRAIN_DATASET))
     print("The number of test data is:", len(TEST_DATASET))

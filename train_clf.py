@@ -33,13 +33,13 @@ def parse_args():
 def main(args):
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    # datapath = './data/ModelNet/'
+    # root = './data/ModelNet/'
 
     if os.path.exists('/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'):
-        datapath = '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+        root = '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
 
     if os.path.exists('/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'):
-        datapath = '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+        root = '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
 
     if args.rotation is not None:
         ROTATION = (int(args.rotation[0:2]),int(args.rotation[3:5]))
@@ -69,12 +69,14 @@ def main(args):
 
     '''DATA LOADING'''
     logger.info('Load dataset ...')
-    train_data, train_label, test_data, test_label = load_data(datapath, classification=True)
+    train_data, train_label, test_data, test_label = load_data(root, classification=True)
     logger.info("The number of training data is: %d",train_data.shape[0])
     logger.info("The number of test data is: %d", test_data.shape[0])
     trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
+
     if ROTATION is not None:
         print('The range of training rotation is',ROTATION)
+    
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=ROTATION)
     trainDataLoader = torch.utils.data.DataLoader(trainDataset, batch_size=args.batchsize, shuffle=True)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batchsize, shuffle=False)

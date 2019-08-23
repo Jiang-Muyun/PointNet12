@@ -61,7 +61,14 @@ def main(args):
     logger.info('PARAMETER ...')
     logger.info(args)
     print('Load data...')
-    train_data, train_label, test_data, test_label = recognize_all_data(test_area = 5)
+
+    if os.path.exists('/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'):
+        root = '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
+
+    if os.path.exists('/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'):
+        root = '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
+
+    train_data, train_label, test_data, test_label = recognize_all_data(root, test_area = 5)
 
     dataset = S3DISDataLoader(train_data,train_label)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batchsize,
@@ -72,7 +79,10 @@ def main(args):
 
     num_classes = 13
     blue = lambda x: '\033[94m' + x + '\033[0m'
-    model = PointNet2SemSeg(num_classes) if args.model_name == 'pointnet2' else PointNetSeg(num_classes,feature_transform=True,semseg = True)
+    if args.model_name == 'pointnet2':
+        model = PointNet2SemSeg(num_classes) 
+    else:
+        model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
 
     if args.pretrain is not None:
         model.load_state_dict(torch.load(args.pretrain))

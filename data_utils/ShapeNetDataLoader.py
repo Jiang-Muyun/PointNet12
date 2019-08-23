@@ -27,9 +27,10 @@ def jitter_point_cloud(batch_data, sigma=0.01, clip=0.05):
     return jittered_data
 
 class PartNormalDataset(Dataset):
-    def __init__(self, npoints=2500, split='train', normalize=True, jitter=False):
+    def __init__(self, root, npoints=2500, split='train', normalize=True, jitter=False):
         self.npoints = npoints
-        self.root = './data/shapenetcore_partanno_segmentation_benchmark_v0_normal'
+        # self.root = './data/shapenetcore_partanno_segmentation_benchmark_v0_normal'
+        self.root = root
         self.catfile = os.path.join(self.root, 'synsetoffset2category.txt')
         self.cat = {}
         self.normalize = normalize
