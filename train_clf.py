@@ -33,7 +33,13 @@ def parse_args():
 def main(args):
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    datapath = './data/ModelNet/'
+    # datapath = './data/ModelNet/'
+
+    if os.path.exists('/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'):
+        datapath = '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+
+    if os.path.exists('/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'):
+        datapath = '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
 
     if args.rotation is not None:
         ROTATION = (int(args.rotation[0:2]),int(args.rotation[3:5]))
