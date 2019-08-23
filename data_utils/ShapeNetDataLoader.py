@@ -41,7 +41,7 @@ class PartNormalDataset(Dataset):
                 ls = line.strip().split()
                 self.cat[ls[0]] = ls[1]
         self.cat = {k: v for k, v in self.cat.items()}
-        # print(self.cat)
+        #print('self.cat', self.cat)
 
         self.meta = {}
         with open(os.path.join(self.root, 'train_test_split', 'shuffled_train_file_list.json'), 'r') as f:
@@ -50,8 +50,10 @@ class PartNormalDataset(Dataset):
             val_ids = set([str(d.split('/')[2]) for d in json.load(f)])
         with open(os.path.join(self.root, 'train_test_split', 'shuffled_test_file_list.json'), 'r') as f:
             test_ids = set([str(d.split('/')[2]) for d in json.load(f)])
+
         for item in self.cat:
             # print('category', item)
+            
             self.meta[item] = []
             dir_point = os.path.join(self.root, self.cat[item])
             fns = sorted(os.listdir(dir_point))
@@ -115,9 +117,6 @@ class PartNormalDataset(Dataset):
         point_set = point_set[choice, :]
         seg = seg[choice]
         normal = normal[choice, :]
-
-
-
         return point_set,cls, seg, normal
 
 
