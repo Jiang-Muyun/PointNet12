@@ -27,7 +27,7 @@ def parse_args():
     parser = argparse.ArgumentParser('PointNet2')
     parser.add_argument('--batchsize', type=int, default=32, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
-    parser.add_argument('--epoch', type=int, default=201, help='number of epochs for training')
+    parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--model_name', type=str, default='pointnet2', help='Name of model')
