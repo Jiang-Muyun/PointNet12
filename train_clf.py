@@ -51,24 +51,12 @@ def main(args):
     checkpoints_dir = './experiment/clf/%s/'%(args.model_name)
     os.makedirs(checkpoints_dir, exist_ok=True)
 
-    '''LOG'''
-    args = parse_args()
-    logger = logging.getLogger("PointNet2")
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(os.path.join(checkpoints_dir,'log.txt'))
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    logger.info('---------------------------------------------------TRANING---------------------------------------------------')
-    logger.info('PARAMETER ...')
-    logger.info(args)
 
     '''DATA LOADING'''
-    logger.info('Load dataset ...')
+    print('Load dataset ...')
     train_data, train_label, test_data, test_label = load_data(root, classification=True)
-    logger.info("The number of training data is: %d",train_data.shape[0])
-    logger.info("The number of test data is: %d", test_data.shape[0])
+    print("The number of training data is:",train_data.shape[0])
+    print("The number of test data is:", test_data.shape[0])
     trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
 
     if ROTATION is not None:
@@ -83,7 +71,6 @@ def main(args):
     classifier = PointNetCls(num_class,args.feature_transform).cuda() if args.model_name == 'pointnet' else PointNet2ClsMsg().cuda()
     if args.pretrain is not None:
         print('Use pretrain model...')
-        logger.info('Use pretrain model')
         checkpoint = torch.load(args.pretrain)
         start_epoch = checkpoint['epoch']
         classifier.load_state_dict(checkpoint['model_state_dict'])
@@ -109,11 +96,9 @@ def main(args):
     blue = lambda x: '\033[94m' + x + '\033[0m'
 
     '''TRANING'''
-    logger.info('Start training...')
+    print('Start training...')
     for epoch in range(start_epoch,args.epoch):
-        print('==> train_clf ->', args.model_name)
-        print('Epoch %d (%d/%s):' % (global_epoch + 1, epoch + 1, args.epoch))
-        logger.info('Epoch %d (%d/%s):' ,global_epoch + 1, epoch + 1, args.epoch)
+        print('==> train_clf ->', args.model_name, 'Epoch %d (%d/%s):' % (global_epoch + 1, epoch + 1, args.epoch))
 
         scheduler.step()
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
@@ -135,31 +120,21 @@ def main(args):
         acc = test(classifier, testDataLoader)
 
         print('\r Loss: %f' % loss.data)
-        logger.info('Loss: %.2f', loss.data)
 
         if args.train_metric:
-            print('Train Accuracy: %f' % train_acc)
-            logger.info('Train Accuracy: %f', (train_acc))
+            print('Train Accuracy:', train_acc)
 
         print('\r Test %s: %f' % (blue('Accuracy'),acc))
-        logger.info('Test Accuracy: %f', acc)
 
-        if (acc >= best_tst_accuracy) and epoch > 5:
+        if acc >= best_tst_accuracy:
             best_tst_accuracy = acc
-            logger.info('Save model...')
-            save_checkpoint(
-                global_epoch + 1,
-                train_acc if args.train_metric else 0.0,
-                acc,
-                classifier,
-                optimizer,
-                str(checkpoints_dir),
-                'clf-' + args.model_name)
-            print('Saving model....')
+            fn_pth = 'partseg-%s-%.5f-%04d.pth'%(args.model_name, best_acc, epoch)
+            print('Saving model....', fn_pth)
+            torch.save(model.state_dict(), os.path.join(checkpoints_dir,fn_pth))
         global_epoch += 1
+    
     print('Best Accuracy: %f'%best_tst_accuracy)
-
-    logger.info('End of training...')
+    print('End of training...')
 
 if __name__ == '__main__':
     args = parse_args()
