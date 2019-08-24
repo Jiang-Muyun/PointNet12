@@ -10,7 +10,6 @@ from torch.autograd import Variable
 from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
 import datetime
-
 from pathlib import Path
 from utils import test_partseg, select_avaliable
 from colors import *
