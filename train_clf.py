@@ -48,7 +48,7 @@ def main(args):
     experiment_dir = './experiment/'
     os.makedirs(experiment_dir,exist_ok=True)
 
-    checkpoints_dir = './experiment/%s/'%(args.model_name)
+    checkpoints_dir = './experiment/clf/%s/'%(args.model_name)
     os.makedirs(checkpoints_dir, exist_ok=True)
 
     '''LOG'''
