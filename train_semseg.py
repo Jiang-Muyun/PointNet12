@@ -108,11 +108,13 @@ def main(args):
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
+
         print(green('semseg'),
             yellow('model:'), blue(args.model_name),
             yellow('gpu:'), blue(args.gpu),
             yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch)),
-            yellow('lr:'), lr)
+            yellow('lr:'), blue(lr)
+        )
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -161,8 +163,8 @@ def main(args):
         if mean_iou > best_meaniou:
             best_meaniou = mean_iou
 
-        print_info('Best accuracy is: %.5f'%best_acc)
-        print_info('Best meanIOU is: %.5f'%best_meaniou)
+        print_kv('Best accuracy:' , '%.5f' % (best_acc))
+        print_kv('Best meanIOU:','%.5f' % (best_meaniou))
 
 if __name__ == '__main__':
     args = parse_args()

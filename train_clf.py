@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument('--epoch',  default=100, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
+    parser.add_argument('--multi_gpu', type=str, default=None, help='whether use multi gpu training')
     parser.add_argument('--train_metric', type=str, default=False, help='whether evaluate on training dataset')
     parser.add_argument('--optimizer', type=str, default='SGD', help='optimizer for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
@@ -89,6 +90,17 @@ def main(args):
         )
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
+    LEARNING_RATE_CLIP = 1e-5
+
+    '''GPU selection and multi-GPU'''
+    if args.multi_gpu is not None:
+        device_ids = [int(x) for x in args.multi_gpu.split(',')]
+        torch.backends.cudnn.benchmark = True
+        model.cuda(device_ids[0])
+        model = torch.nn.DataParallel(model, device_ids=device_ids)
+    else:
+        model.cuda()
+
     global_epoch = 0
     global_step = 0
     best_tst_accuracy = 0.0
@@ -96,13 +108,19 @@ def main(args):
     '''TRANING'''
     print('Start training...')
     for epoch in range(start_epoch,args.epoch):
+        scheduler.step()
+        lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
+
         print(green('clf'),
             yellow('model:'), blue(args.model_name),
             yellow('gpu:'), blue(args.gpu),
-            yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch))
+            yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch)),
+            yellow('lr:'), blue(lr)
         )
 
-        scheduler.step()
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
             points, target = data
             target = target[:, 0]

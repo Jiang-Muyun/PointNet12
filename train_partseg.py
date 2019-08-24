@@ -31,13 +31,12 @@ def parse_args():
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
+    parser.add_argument('--multi_gpu', type=str, default=None, help='whether use multi gpu training')
     parser.add_argument('--model_name', type=str, default='pointnet2', help='Name of model')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
-    parser.add_argument('--multi_gpu', type=str, default=None, help='whether use multi gpu training')
     parser.add_argument('--jitter', default=False, help="randomly jitter point cloud")
-    parser.add_argument('--step_size', type=int, default=20, help="randomly rotate point cloud")
 
     return parser.parse_args()
 
@@ -96,7 +95,7 @@ def main(args):
             eps=1e-08,
             weight_decay=args.decay_rate
         )
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
     '''GPU selection and multi-GPU'''
     if args.multi_gpu is not None:
@@ -121,7 +120,8 @@ def main(args):
             yellow('model:'), blue(args.model_name),
             yellow('gpu:'), blue(args.gpu),
             yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch)),
-            yellow('lr:'), lr)
+            yellow('lr:'), blue(lr)
+        )
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -173,9 +173,9 @@ def main(args):
         if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
 
-        print_kv('Best accuracy:', best_acc)
-        print_kv('Best class avg mIOU:', best_class_avg_iou)
-        print_kv('Best inctance avg mIOU:', best_inctance_avg_iou)
+        print_kv('Best accuracy:', '%.5f'%(best_acc))
+        print_kv('Best class avg mIOU:', '%.5f'%(best_class_avg_iou))
+        print_kv('Best inctance avg mIOU:', '%.5f'%(best_inctance_avg_iou))
 
 
 if __name__ == '__main__':

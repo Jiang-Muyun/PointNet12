@@ -93,7 +93,7 @@ class PartNormalDataset(Dataset):
 
         msg = ''
         for cat in sorted(self.seg_classes.keys()):
-            msg += cat + ':' + str(self.seg_classes[cat]) + '\t'
+            msg += cat + ':' + str(self.seg_classes[cat]) + ' '
         print_debug(msg)
 
         self.cache = {}  # from index to (point_set, cls, seg) tuple
