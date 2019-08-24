@@ -131,6 +131,7 @@ def main(args):
             points, label, target,norm_plt = points.cuda(),label.squeeze().cuda(), target.cuda(), norm_plt.cuda()
             optimizer.zero_grad()
             model = model.train()
+
             if args.model_name == 'pointnet':
                 labels_pred, seg_pred, trans_feat = model(points, to_categorical(label, 16))
                 seg_pred = seg_pred.contiguous().view(-1, num_part)
@@ -149,7 +150,7 @@ def main(args):
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
-        print('==> train_partseg: %s gpu:%s',blue(args.model_name),blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
+        print('partseg',blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
         print(' >',blue('Test Accuracy'),test_metrics['accuracy'])
         print(' >',blue('Class avg mIOU:'),test_metrics['class_avg_iou'])
         print(' >',blue('Inctance avg mIOU:'),test_metrics['inctance_avg_iou'])

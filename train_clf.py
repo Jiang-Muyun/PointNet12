@@ -97,7 +97,7 @@ def main(args):
     '''TRANING'''
     print('Start training...')
     for epoch in range(start_epoch,args.epoch):
-        print('==> train_clf: %s gpu:%s',blue(args.model_name),blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
+        print('clf',blue(args.model_name),'gpu:',blue(args.gpu),'Epoch %d/%s:' % (epoch, args.epoch))
 
         scheduler.step()
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
