@@ -1,6 +1,8 @@
 import argparse
 import os
 import torch
+import time
+import datetime
 import numpy as np
 import torch.nn.parallel
 import torch.utils.data
@@ -8,7 +10,6 @@ from collections import defaultdict
 from torch.autograd import Variable
 from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class2label
 import torch.nn.functional as F
-import datetime
 from pathlib import Path
 from utils import test_semseg, select_avaliable
 from colors import *
@@ -144,6 +145,7 @@ def main(args):
         
         print_debug('clear cuda cache')
         torch.cuda.empty_cache()
+        time.sleep(0.05)
 
         pointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_semseg(model.eval(), testdataloader, seg_label_to_cat,num_classes = num_classes,pointnet2=pointnet2)

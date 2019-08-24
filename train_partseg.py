@@ -1,5 +1,7 @@
 import argparse
 import os
+import time
+import datetime
 import torch
 import torch.nn.parallel
 import torch.utils.data
@@ -9,7 +11,6 @@ from collections import defaultdict
 from torch.autograd import Variable
 from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
-import datetime
 from pathlib import Path
 from utils import test_partseg, select_avaliable
 from colors import *
@@ -151,6 +152,7 @@ def main(args):
 
         print_debug('clear cuda cache')
         torch.cuda.empty_cache()
+        time.sleep(0.05)
 
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
