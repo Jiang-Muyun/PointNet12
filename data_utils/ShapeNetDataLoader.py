@@ -5,6 +5,7 @@ import warnings
 import numpy as np
 from torch.utils.data import Dataset
 warnings.filterwarnings('ignore')
+from ..colors import *
 
 def pc_normalize(pc):
     centroid = np.mean(pc, axis=0)

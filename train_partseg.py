@@ -12,7 +12,8 @@ import torch.nn.functional as F
 import datetime
 import logging
 from pathlib import Path
-from utils import test_partseg, select_avaliable,red,green,yellow,blue
+from utils import test_partseg, select_avaliable
+from colors import *
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSeg_msg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss

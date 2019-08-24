@@ -9,7 +9,8 @@ import datetime
 import logging
 from pathlib import Path
 from tqdm import tqdm
-from utils import test, save_checkpoint, select_avaliable,red,green,yellow,blue
+from utils import test, save_checkpoint, select_avaliable
+from colors import *
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 
@@ -51,14 +52,14 @@ def main(args):
     os.makedirs(checkpoints_dir, exist_ok=True)
 
     '''DATA LOADING'''
-    print('Load dataset ...')
+    print_info('Load dataset ...')
     train_data, train_label, test_data, test_label = load_data(root, classification=True)
-    print("The number of training data is:",train_data.shape[0])
-    print("The number of test data is:", test_data.shape[0])
+    print_info("The number of training data is:",train_data.shape[0])
+    print_info("The number of test data is:", test_data.shape[0])
     trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
 
     if ROTATION is not None:
-        print('The range of training rotation is',ROTATION)
+        print_info('The range of training rotation is',ROTATION)
     
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=ROTATION)
     trainDataLoader = torch.utils.data.DataLoader(trainDataset, batch_size=args.batchsize, shuffle=True)
@@ -68,12 +69,12 @@ def main(args):
     num_class = 40
     model = PointNetCls(num_class,args.feature_transform).cuda() if args.model_name == 'pointnet' else PointNet2ClsMsg().cuda()
     if args.pretrain is not None:
-        print('Use pretrain model...')
+        print_info('Use pretrain model...')
         checkpoint = torch.load(args.pretrain)
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['model_state_dict'])
     else:
-        print('No existing model, starting training from scratch...')
+        print_info('No existing model, starting training from scratch...')
         start_epoch = 0
 
     if args.optimizer == 'SGD':
@@ -95,7 +96,9 @@ def main(args):
     '''TRANING'''
     print('Start training...')
     for epoch in range(start_epoch,args.epoch):
-        print(green('clf'),blue(args.model_name),'gpu:',blue(args.gpu),'Epoch:','%d/%s'%(epoch, args.epoch))
+        print_kv('train_clf',args.model_name)
+        print_kv('gpu',args.gpu)
+        print_kv('Epoch','%d/%s'%(epoch, args.epoch))
 
         scheduler.step()
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
@@ -116,21 +119,21 @@ def main(args):
         train_acc = test(model.eval(), trainDataLoader) if args.train_metric else None
         acc = test(model, testDataLoader)
 
-        print(blue('loss'), loss.data)
-        print(blue('Test Accuracy'), acc)
+        print_kv('loss', loss.data)
+        print_kv('Test Accuracy', acc)
         if args.train_metric:
-            print(blue('Train Accuracy'), train_acc)
+            print_kv('Train Accuracy', train_acc)
 
         if acc >= best_tst_accuracy:
             best_tst_accuracy = acc
             fn_pth = 'clf-%s-%.5f-%04d.pth'%(args.model_name, acc, epoch)
-            print('Saving model....', fn_pth)
+            print_kv('Saving model....', fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir,fn_pth))
         global_epoch += 1
 
         torch.cuda.empty_cache()
-    print('Best Accuracy: %f'%best_tst_accuracy)
-    print('End of training...')
+    print_kv('Best Accuracy', best_tst_accuracy)
+    print_info('End of training...')
 
 if __name__ == '__main__':
     args = parse_args()

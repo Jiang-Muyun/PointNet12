@@ -11,7 +11,8 @@ import torch.nn.functional as F
 import datetime
 import logging
 from pathlib import Path
-from utils import test_semseg, select_avaliable, red,green,yellow,blue
+from utils import test_semseg, select_avaliable
+from colors import *
 from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer

@@ -3,6 +3,7 @@ import os
 from torch.utils.data import Dataset
 import numpy as np
 import h5py
+from ..colors import *
 
 classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
 class2label = {cls: i for i,cls in enumerate(classes)}
@@ -17,7 +18,7 @@ def load_h5(h5_filename):
     return (data, label)
 
 def loadDataFile(filename):
-    print(filename)
+    print_debug(filename)
     return load_h5(filename)
 
 def recognize_all_data(root, test_area = 5):
