@@ -63,7 +63,7 @@ def main(args):
     dataloader = DataLoader(train_ds, batch_size=args.batchsize, shuffle=True, num_workers=int(args.workers))
     
     test_ds = PartNormalDataset(dataset_root,npoints=2048, split='test',normalize=norm,jitter=False)
-    testdataloader = DataLoader(test_ds, batch_size=10, shuffle=True, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_ds, batch_size=args.batchsize, shuffle=True, num_workers=int(args.workers))
     
     print_kv("The number of training data is:",len(train_ds))
     print_kv("The number of test data is:", len(test_ds))
@@ -153,7 +153,6 @@ def main(args):
             
         print_debug('clear cuda cache')
         torch.cuda.empty_cache()
-        time.sleep(0.05)
 
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
