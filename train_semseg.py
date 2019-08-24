@@ -41,11 +41,14 @@ def main(args):
     '''CREATE DIR'''
     experiment_dir = Path('./experiment/')
     experiment_dir.mkdir(exist_ok=True)
+    
     file_dir = Path(str(experiment_dir) +'/%sSemSeg-'%args.model_name+ str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
     file_dir.mkdir(exist_ok=True)
-    checkpoints_dir = file_dir.joinpath('checkpoints/')
+
+    checkpoints_dir = file_dir
     checkpoints_dir.mkdir(exist_ok=True)
-    log_dir = file_dir.joinpath('logs/')
+
+    log_dir = file_dir
     log_dir.mkdir(exist_ok=True)
 
     '''LOG'''
@@ -152,15 +155,21 @@ def main(args):
                  epoch, blue('test'), test_metrics['accuracy'],mean_iou))
         logger.info('Epoch %d  %s accuracy: %f  meanIOU: %f' % (
                  epoch, 'test', test_metrics['accuracy'],mean_iou))
+
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
-            torch.save(model.state_dict(), '%s/%s_%.3d_%.4f.pth' % (checkpoints_dir,args.model_name, epoch, best_acc))
+            torch.save(
+                model.state_dict(), 
+                '%s/semseg-%s-%.5f-%04d.pth' % (checkpoints_dir,args.model_name, best_acc, epoch)
+            )
             logger.info(cat_mean_iou)
             logger.info('Save model..')
             print('Save model..')
             print(cat_mean_iou)
+        
         if mean_iou > best_meaniou:
             best_meaniou = mean_iou
+        
         print('Best accuracy is: %.5f'%best_acc)
         logger.info('Best accuracy is: %.5f'%best_acc)
         print('Best meanIOU is: %.5f'%best_meaniou)

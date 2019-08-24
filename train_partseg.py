@@ -45,11 +45,14 @@ def main(args):
     '''CREATE DIR'''
     experiment_dir = Path('./experiment/')
     experiment_dir.mkdir(exist_ok=True)
+    
     file_dir = Path(str(experiment_dir) +'/%sPartSeg-'%args.model_name + str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
     file_dir.mkdir(exist_ok=True)
-    checkpoints_dir = file_dir.joinpath('checkpoints/')
+    
+    checkpoints_dir = file_dir
     checkpoints_dir.mkdir(exist_ok=True)
-    log_dir = file_dir.joinpath('logs/')
+
+    log_dir = file_dir
     log_dir.mkdir(exist_ok=True)
 
     '''LOG'''
@@ -172,7 +175,10 @@ def main(args):
         
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
-            torch.save(model.state_dict(), '%s/%s_%.3d_%.4f.pth' % (checkpoints_dir,args.model_name, epoch, best_acc))
+            torch.save(
+                model.state_dict(), 
+                '%s/partseg-%s-%.5f-%04d.pth' % (checkpoints_dir, args.model_name, best_acc, epoch)
+            )
             logger.info(cat_mean_iou)
             logger.info('Save model..')
             print('Save model..')

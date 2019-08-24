@@ -154,7 +154,7 @@ def main(args):
                 classifier,
                 optimizer,
                 str(checkpoints_dir),
-                args.model_name)
+                'clf-' + args.model_name)
             print('Saving model....')
         global_epoch += 1
     print('Best Accuracy: %f'%best_tst_accuracy)

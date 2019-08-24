@@ -38,7 +38,7 @@ def show_example(x, y, x_reconstruction, y_pred,save_dir, figname):
     plt.savefig(save_dir + figname + '.png')
 
 def save_checkpoint(epoch, train_accuracy, test_accuracy, model, optimizer, path,modelnet='checkpoint'):
-    savepath  = path + '/%s-%f-%04d.pth' % (modelnet,test_accuracy, epoch)
+    savepath  = path + '/%s-%.5f-%04d.pth' % (modelnet,test_accuracy, epoch)
     state = {
         'epoch': epoch,
         'train_accuracy': train_accuracy,
