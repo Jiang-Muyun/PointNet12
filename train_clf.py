@@ -112,6 +112,7 @@ def main(args):
     '''TRANING'''
     logger.info('Start training...')
     for epoch in range(start_epoch,args.epoch):
+        print('==> train_clf ->', args.model_name)
         print('Epoch %d (%d/%s):' % (global_epoch + 1, epoch + 1, args.epoch))
         logger.info('Epoch %d (%d/%s):' ,global_epoch + 1, epoch + 1, args.epoch)
 

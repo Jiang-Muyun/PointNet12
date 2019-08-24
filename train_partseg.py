@@ -163,11 +163,13 @@ def main(args):
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
+        print('==> train_partseg ->', args.model_name)
         print('Epoch %d %s accuracy: %f  Class avg mIOU: %f   Inctance avg mIOU: %f' % (
                  epoch, blue('test'), test_metrics['accuracy'],test_metrics['class_avg_iou'],test_metrics['inctance_avg_iou']))
 
         logger.info('Epoch %d %s Accuracy: %f  Class avg mIOU: %f   Inctance avg mIOU: %f' % (
                  epoch, blue('test'), test_metrics['accuracy'],test_metrics['class_avg_iou'],test_metrics['inctance_avg_iou']))
+        
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
             torch.save(model.state_dict(), '%s/%s_%.3d_%.4f.pth' % (checkpoints_dir,args.model_name, epoch, best_acc))
@@ -175,10 +177,13 @@ def main(args):
             logger.info('Save model..')
             print('Save model..')
             print(cat_mean_iou)
+
         if test_metrics['class_avg_iou'] > best_class_avg_iou:
             best_class_avg_iou = test_metrics['class_avg_iou']
+
         if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
+
         print('Best accuracy is: %.5f'%best_acc)
         logger.info('Best accuracy is: %.5f'%best_acc)
         print('Best class avg mIOU is: %.5f'%best_class_avg_iou)
