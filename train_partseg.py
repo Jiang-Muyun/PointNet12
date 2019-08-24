@@ -117,7 +117,7 @@ def main(args):
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        print_kv('Learning rate:', lr))
+        print_kv('Learning rate:', lr)
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
