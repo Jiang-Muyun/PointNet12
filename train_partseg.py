@@ -55,9 +55,11 @@ def main(args):
     norm = True if args.model_name == 'pointnet' else False
 
     root = select_avaliable([
-        '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
+        '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
         '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
     ])
+
+    print(root)
 
     train_ds = PartNormalDataset(root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
     dataloader = DataLoader(train_ds, batch_size=args.batchsize, shuffle=True, num_workers=int(args.workers))
@@ -66,9 +68,8 @@ def main(args):
     testdataloader = DataLoader(test_ds, batch_size=10, shuffle=True, num_workers=int(args.workers))
     
     print("The number of training data is:",len(train_ds))
-    print("The number of training data is:%d",len(train_ds))
     print("The number of test data is:", len(test_ds))
-    print("The number of test data is:%d", len(test_ds))
+
     num_classes = 16
     num_part = 50
     blue = lambda x: '\033[94m' + x + '\033[0m'
@@ -81,10 +82,9 @@ def main(args):
     if args.pretrain is not None:
         model.load_state_dict(torch.load(args.pretrain))
         print('load model %s'%args.pretrain)
-        print('load model %s'%args.pretrain)
     else:
         print('Training from scratch')
-        print('Training from scratch')
+
     pretrain = args.pretrain
     init_epoch = int(pretrain[-14:-11]) if args.pretrain is not None else 0
 
@@ -120,8 +120,10 @@ def main(args):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
         print('Learning rate:%f' % lr)
+        
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
+
         for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader),smoothing=0.9):
             points, label, target, norm_plt = data
             points, label, target = Variable(points.float()),Variable(label.long()),  Variable(target.long())
