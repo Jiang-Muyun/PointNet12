@@ -6,6 +6,7 @@ import datetime
 import numpy as np
 import torch.nn.parallel
 import torch.utils.data
+from torch.utils.data import DataLoader
 from collections import defaultdict
 from torch.autograd import Variable
 from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class2label
@@ -24,6 +25,7 @@ for i,cat in enumerate(seg_classes.keys()):
 
 def parse_args():
     parser = argparse.ArgumentParser('PointNet')
+    parser.add_argument('--model_name', type=str, default='pointnet2', help='pointnet or pointnet2')
     parser.add_argument('--batchsize', type=int, default=32, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
@@ -33,7 +35,6 @@ def parse_args():
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--multi_gpu', type=str, default=None, help='whether use multi gpu training')
-    parser.add_argument('--model_name', type=str, default='pointnet2', help='Name of model')
 
     return parser.parse_args()
 
@@ -49,20 +50,19 @@ def main(args):
     print('PARAMETER ...')
     print(args)
 
-    root = select_avaliable([
+    dataset_root = select_avaliable([
         '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
         '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
     ])
 
     print('Load data...')
-    train_data, train_label, test_data, test_label = recognize_all_data(root, test_area = 5)
+    train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
 
     dataset = S3DISDataLoader(train_data,train_label)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batchsize,
-                                             shuffle=True, num_workers=int(args.workers))
+    dataloader = DataLoader(dataset, batch_size=args.batchsize,shuffle=True, num_workers=int(args.workers))
+    
     test_dataset = S3DISDataLoader(test_data,test_label)
-    testdataloader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batchsize,
-                                                 shuffle=True, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_dataset, batch_size=args.batchsize,shuffle=True, num_workers=int(args.workers))
 
     num_classes = 13
     if args.model_name == 'pointnet2':
@@ -87,8 +87,8 @@ def main(args):
             lr=args.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-08,
-            weight_decay=args.decay_rate
-        )
+            weight_decay=args.decay_rate)
+            
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
     LEARNING_RATE_CLIP = 1e-5
 
@@ -147,8 +147,13 @@ def main(args):
         torch.cuda.empty_cache()
         time.sleep(0.05)
 
-        pointnet2 = args.model_name == 'pointnet2'
-        test_metrics, test_hist_acc, cat_mean_iou = test_semseg(model.eval(), testdataloader, seg_label_to_cat,num_classes = num_classes,pointnet2=pointnet2)
+        test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
+            model.eval(), 
+            testdataloader, 
+            seg_label_to_cat,
+            num_classes = num_classes,
+            pointnet2 = args.model_name == 'pointnet2'
+        )
         mean_iou = np.mean(cat_mean_iou)
 
         print_kv('Test accuracy',test_metrics['accuracy'])

@@ -147,6 +147,7 @@ def test_semseg(model, loader, catdict, num_classes = 13, pointnet2=False):
     iou_tabel = np.zeros((len(catdict),3))
     metrics = defaultdict(lambda:list())
     hist_acc = []
+    
     for batch_id, (points, target) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
         batchsize, num_point, _ = points.size()
         points, target = Variable(points.float()), Variable(target.long())
@@ -164,6 +165,7 @@ def test_semseg(model, loader, catdict, num_classes = 13, pointnet2=False):
         pred_choice = pred.data.max(1)[1]
         correct = pred_choice.eq(target.data).cpu().sum()
         metrics['accuracy'].append(correct.item()/ (batchsize * num_point))
+
     iou_tabel[:,2] = iou_tabel[:,0] /iou_tabel[:,1]
     hist_acc += metrics['accuracy']
     metrics['accuracy'] = np.mean(metrics['accuracy'])

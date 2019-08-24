@@ -5,6 +5,7 @@ import datetime
 import torch
 import torch.nn.parallel
 import torch.utils.data
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from data_utils.ModelNetDataLoader import ModelNetDataLoader, load_data
 from pathlib import Path
@@ -17,56 +18,52 @@ from model.pointnet import PointNetCls, feature_transform_reguliarzer
 def parse_args():
     '''PARAMETERS'''
     parser = argparse.ArgumentParser('PointNet')
+    parser.add_argument('--model_name', default='pointnet2', help='pointnet or pointnet2')
     parser.add_argument('--batchsize', type=int, default=24, help='batch size in training')
     parser.add_argument('--epoch',  default=100, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--multi_gpu', type=str, default=None, help='whether use multi gpu training')
     parser.add_argument('--train_metric', type=str, default=False, help='whether evaluate on training dataset')
-    parser.add_argument('--optimizer', type=str, default='SGD', help='optimizer for training')
+    parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='decay rate of learning rate')
     parser.add_argument('--rotation',  default=None, help='range of training rotation')
-    parser.add_argument('--model_name', default='pointnet2', help='range of training rotation')
     parser.add_argument('--feature_transform', default=False, help="use feature transform in pointnet")
     return parser.parse_args()
 
 def main(args):
-    '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     
-    root = select_avaliable([
+    dataset_root = select_avaliable([
         '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
         '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
     ])
 
-    if args.rotation is not None:
-        ROTATION = (int(args.rotation[0:2]),int(args.rotation[3:5]))
-    else:
-        ROTATION = None
-
-    '''CREATE DIR'''
     experiment_dir = './experiment/'
     os.makedirs(experiment_dir,exist_ok=True)
 
     checkpoints_dir = './experiment/clf/%s/'%(args.model_name)
     os.makedirs(checkpoints_dir, exist_ok=True)
 
-    '''DATA LOADING'''
-    print_info('Load dataset ...')
-    train_data, train_label, test_data, test_label = load_data(root, classification=True)
-    print_kv("The number of training data is:",train_data.shape[0])
-    print_kv("The number of test data is:", test_data.shape[0])
-    trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
+    print_info('Loading dataset ...')
+    train_data, train_label, test_data, test_label = load_data(dataset_root, classification=True)
 
-    if ROTATION is not None:
-        print_kv('The range of training rotation is:',ROTATION)
+    print_kv("Training data:",train_data.shape)
+    print_kv("Test data:", test_data.shape)
     
+    if args.rotation is not None:
+        ROTATION = (int(args.rotation[0:2]),int(args.rotation[3:5]))
+        print_kv('The range of training rotation is:',ROTATION)
+    else:
+        ROTATION = None
+
+    trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
+    trainDataLoader = DataLoader(trainDataset, batch_size=args.batchsize, shuffle=True)
+
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=ROTATION)
-    trainDataLoader = torch.utils.data.DataLoader(trainDataset, batch_size=args.batchsize, shuffle=True)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batchsize, shuffle=False)
 
-    '''MODEL LOADING'''
     num_class = 40
     model = PointNetCls(num_class,args.feature_transform).cuda() if args.model_name == 'pointnet' else PointNet2ClsMsg().cuda()
     if args.pretrain is not None:
@@ -86,8 +83,7 @@ def main(args):
             lr=args.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-08,
-            weight_decay=args.decay_rate
-        )
+            weight_decay=args.decay_rate)
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
     LEARNING_RATE_CLIP = 1e-5

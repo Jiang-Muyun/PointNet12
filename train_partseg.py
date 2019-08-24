@@ -26,13 +26,13 @@ for cat in seg_classes.keys():
 
 def parse_args():
     parser = argparse.ArgumentParser('PointNet2')
+    parser.add_argument('--model_name', type=str, default='pointnet2', help='pointnet or pointnet2')
     parser.add_argument('--batchsize', type=int, default=32, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--multi_gpu', type=str, default=None, help='whether use multi gpu training')
-    parser.add_argument('--model_name', type=str, default='pointnet2', help='Name of model')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
@@ -54,15 +54,15 @@ def main(args):
 
     norm = True if args.model_name == 'pointnet' else False
 
-    root = select_avaliable([
+    dataset_root = select_avaliable([
         '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
         '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
     ])
 
-    train_ds = PartNormalDataset(root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
+    train_ds = PartNormalDataset(dataset_root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
     dataloader = DataLoader(train_ds, batch_size=args.batchsize, shuffle=True, num_workers=int(args.workers))
     
-    test_ds = PartNormalDataset(root,npoints=2048, split='test',normalize=norm,jitter=False)
+    test_ds = PartNormalDataset(dataset_root,npoints=2048, split='test',normalize=norm,jitter=False)
     testdataloader = DataLoader(test_ds, batch_size=10, shuffle=True, num_workers=int(args.workers))
     
     print_kv("The number of training data is:",len(train_ds))
@@ -93,8 +93,8 @@ def main(args):
             lr=args.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-08,
-            weight_decay=args.decay_rate
-        )
+            weight_decay=args.decay_rate)
+            
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
     '''GPU selection and multi-GPU'''
