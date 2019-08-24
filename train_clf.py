@@ -97,7 +97,7 @@ def main(args):
     '''TRANING'''
     print('Start training...')
     for epoch in range(start_epoch,args.epoch):
-        print('clf',blue(args.model_name),'gpu:',blue(args.gpu),'Epoch %d/%s:' % (epoch, args.epoch))
+        print('clf',blue(args.model_name),'gpu:',blue(args.gpu),'Epoch:','%d/%s'%(epoch, args.epoch))
 
         scheduler.step()
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
@@ -129,7 +129,8 @@ def main(args):
             print('Saving model....', fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir,fn_pth))
         global_epoch += 1
-    
+
+        torch.cuda.empty_cache()
     print('Best Accuracy: %f'%best_tst_accuracy)
     print('End of training...')
 
