@@ -45,19 +45,18 @@ def main(args):
         ROTATION = None
 
     '''CREATE DIR'''
-    experiment_dir = Path('./experiment/')
-    experiment_dir.mkdir(exist_ok=True)
-    checkpoints_dir = Path('./experiment/checkpoints/')
-    checkpoints_dir.mkdir(exist_ok=True)
-    log_dir = Path('./experiment/logs/')
-    log_dir.mkdir(exist_ok=True)
+    experiment_dir = './experiment/'
+    os.makedirs(experiment_dir,exist_ok=True)
+
+    checkpoints_dir = './experiment/%s/'%(args.model_name)
+    os.makedirs(checkpoints_dir, exist_ok=True)
 
     '''LOG'''
     args = parse_args()
     logger = logging.getLogger("PointNet2")
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler('./experiment/logs/train_%s_'%args.model_name+ str(datetime.datetime.now().strftime('%Y-%m-%d %H-%M'))+'.txt')
+    file_handler = logging.FileHandler(os.path.join(checkpoints_dir,'log.txt'))
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
@@ -135,12 +134,13 @@ def main(args):
         train_acc = test(classifier.eval(), trainDataLoader) if args.train_metric else None
         acc = test(classifier, testDataLoader)
 
-
         print('\r Loss: %f' % loss.data)
         logger.info('Loss: %.2f', loss.data)
+
         if args.train_metric:
             print('Train Accuracy: %f' % train_acc)
             logger.info('Train Accuracy: %f', (train_acc))
+
         print('\r Test %s: %f' % (blue('Accuracy'),acc))
         logger.info('Test Accuracy: %f', acc)
 
