@@ -116,6 +116,8 @@ def main(args):
 
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
+        
+        print(green('partseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
         print_kv('Learning rate:', lr)
 
@@ -152,7 +154,6 @@ def main(args):
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
-        print(green('partseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
         print_kv('Test Accuracy',test_metrics['accuracy'])
         print_kv('Class avg mIOU:',test_metrics['class_avg_iou'])
         print_kv('Inctance avg mIOU:',test_metrics['inctance_avg_iou'])

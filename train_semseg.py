@@ -107,6 +107,7 @@ def main(args):
 
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
+        print(green('semseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
         print('Learning rate:%f' % lr)
 
@@ -144,7 +145,6 @@ def main(args):
         test_metrics, test_hist_acc, cat_mean_iou = test_semseg(model.eval(), testdataloader, seg_label_to_cat,num_classes = num_classes,pointnet2=pointnet2)
         mean_iou = np.mean(cat_mean_iou)
 
-        print(green('semseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
         print_kv('Test accuracy',test_metrics['accuracy'])
         print_kv('Test meanIOU',mean_iou)
 
