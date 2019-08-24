@@ -91,8 +91,10 @@ class PartNormalDataset(Dataset):
                             'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40],
                             'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
 
+        msg = ''
         for cat in sorted(self.seg_classes.keys()):
-            print_debug(cat + ':' + str(self.seg_classes[cat]))
+            msg += cat + ':' + str(self.seg_classes[cat]) + '\t'
+        print_debug(msg)
 
         self.cache = {}  # from index to (point_set, cls, seg) tuple
         self.cache_size = 20000

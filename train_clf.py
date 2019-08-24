@@ -99,7 +99,8 @@ def main(args):
         print(green('clf'),
             yellow('model:'), blue(args.model_name),
             yellow('gpu:'), blue(args.gpu),
-            yellow('epoch:'), '%d/%s' % (epoch, args.epoch))
+            yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch))
+        )
 
         scheduler.step()
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):

@@ -120,7 +120,7 @@ def main(args):
         print(green('semseg'),
             yellow('model:'), blue(args.model_name),
             yellow('gpu:'), blue(args.gpu),
-            yellow('epoch:'), '%d/%s' % (epoch, args.epoch),
+            yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch)),
             yellow('lr:'), lr)
 
         for param_group in optimizer.param_groups:
