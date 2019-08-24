@@ -54,12 +54,12 @@ def main(args):
     '''DATA LOADING'''
     print_info('Load dataset ...')
     train_data, train_label, test_data, test_label = load_data(root, classification=True)
-    print_info("The number of training data is:",train_data.shape[0])
-    print_info("The number of test data is:", test_data.shape[0])
+    print_kv("The number of training data is:",train_data.shape[0])
+    print_kv("The number of test data is:", test_data.shape[0])
     trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
 
     if ROTATION is not None:
-        print_info('The range of training rotation is',ROTATION)
+        print_kv('The range of training rotation is',ROTATION)
     
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=ROTATION)
     trainDataLoader = torch.utils.data.DataLoader(trainDataset, batch_size=args.batchsize, shuffle=True)
