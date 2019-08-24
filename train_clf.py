@@ -128,7 +128,7 @@ def main(args):
 
         if acc >= best_tst_accuracy:
             best_tst_accuracy = acc
-            fn_pth = 'partseg-%s-%.5f-%04d.pth'%(args.model_name, best_acc, epoch)
+            fn_pth = 'partseg-%s-%.5f-%04d.pth'%(args.model_name, acc, epoch)
             print('Saving model....', fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir,fn_pth))
         global_epoch += 1
