@@ -59,7 +59,7 @@ def main(args):
     trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
 
     if ROTATION is not None:
-        print_kv('The range of training rotation is',ROTATION)
+        print_kv('The range of training rotation is:',ROTATION)
     
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=ROTATION)
     trainDataLoader = torch.utils.data.DataLoader(trainDataset, batch_size=args.batchsize, shuffle=True)
@@ -96,10 +96,8 @@ def main(args):
     '''TRANING'''
     print('Start training...')
     for epoch in range(start_epoch,args.epoch):
-        print_kv('train_clf',args.model_name)
-        print_kv('gpu',args.gpu)
-        print_kv('Epoch','%d/%s'%(epoch, args.epoch))
-
+        print(green('clf'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
+        
         scheduler.step()
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
             points, target = data
@@ -115,6 +113,9 @@ def main(args):
             loss.backward()
             optimizer.step()
             global_step += 1
+        
+        print_debug('clear cuda cache')
+        torch.cuda.empty_cache()
 
         train_acc = test(model.eval(), trainDataLoader) if args.train_metric else None
         acc = test(model, testDataLoader)
@@ -131,7 +132,6 @@ def main(args):
             torch.save(model.state_dict(), os.path.join(checkpoints_dir,fn_pth))
         global_epoch += 1
 
-        torch.cuda.empty_cache()
     print_kv('Best Accuracy', best_tst_accuracy)
     print_info('End of training...')
 

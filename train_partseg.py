@@ -66,8 +66,8 @@ def main(args):
     test_ds = PartNormalDataset(root,npoints=2048, split='test',normalize=norm,jitter=False)
     testdataloader = DataLoader(test_ds, batch_size=10, shuffle=True, num_workers=int(args.workers))
     
-    print("The number of training data is:",len(train_ds))
-    print("The number of test data is:", len(test_ds))
+    print_kv("The number of training data is:",len(train_ds))
+    print_kv("The number of test data is:", len(test_ds))
 
     num_classes = 16
     num_part = 50
@@ -79,9 +79,9 @@ def main(args):
 
     if args.pretrain is not None:
         model.load_state_dict(torch.load(args.pretrain))
-        print('load model %s'%args.pretrain)
+        print_info('load model %s'%args.pretrain)
     else:
-        print('Training from scratch')
+        print_info('Training from scratch')
 
     pretrain = args.pretrain
     init_epoch = int(pretrain[-14:-11]) if args.pretrain is not None else 0
@@ -117,7 +117,7 @@ def main(args):
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        print(blue('Learning rate'), yellow(lr))
+        print_kv('Learning rate:', lr))
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -146,28 +146,29 @@ def main(args):
             loss.backward()
             optimizer.step()
 
+        print_debug('clear cuda cache')
+        torch.cuda.empty_cache()
+
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
         print(green('partseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
-        print(' >',blue('Test Accuracy'),test_metrics['accuracy'])
-        print(' >',blue('Class avg mIOU:'),test_metrics['class_avg_iou'])
-        print(' >',blue('Inctance avg mIOU:'),test_metrics['inctance_avg_iou'])
+        print_kv('Test Accuracy',test_metrics['accuracy'])
+        print_kv('Class avg mIOU:',test_metrics['class_avg_iou'])
+        print_kv('Inctance avg mIOU:',test_metrics['inctance_avg_iou'])
 
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
             fn_pth = 'partseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
-            print('Save model...',fn_pth)
+            print_kv('Save model...',fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            print(cat_mean_iou)
+            print_info(cat_mean_iou)
 
         if test_metrics['class_avg_iou'] > best_class_avg_iou:
             best_class_avg_iou = test_metrics['class_avg_iou']
 
         if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
-        
-        torch.cuda.empty_cache()
 
         print('Best accuracy is: %.5f'%best_acc)
         print('Best class avg mIOU is: %.5f'%best_class_avg_iou)

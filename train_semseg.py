@@ -136,25 +136,30 @@ def main(args):
             history['loss'].append(loss.cpu().data.numpy())
             loss.backward()
             optimizer.step()
+        
+        print_debug('clear cuda cache')
+        torch.cuda.empty_cache()
+
         pointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_semseg(model.eval(), testdataloader, seg_label_to_cat,num_classes = num_classes,pointnet2=pointnet2)
         mean_iou = np.mean(cat_mean_iou)
 
-        print('==> train_semseg ->', args.model_name)
-        print('Epoch %d %s accuracy: %f  meanIOU: %f' % (epoch, blue('test'), test_metrics['accuracy'],mean_iou))
+        print(green('semseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
+        print_kv('Test accuracy',test_metrics['accuracy'])
+        print_kv('Test meanIOU',mean_iou)
 
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
             fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
-            print('Save model...',fn_pth)            
+            print_kv('Save model...',fn_pth)            
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            print(cat_mean_iou)
+            print_info(cat_mean_iou)
         
         if mean_iou > best_meaniou:
             best_meaniou = mean_iou
-        
-        print('Best accuracy is: %.5f'%best_acc)
-        print('Best meanIOU is: %.5f'%best_meaniou)
+
+        print_info('Best accuracy is: %.5f'%best_acc)
+        print_info('Best meanIOU is: %.5f'%best_meaniou)
 
 if __name__ == '__main__':
     args = parse_args()
