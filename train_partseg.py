@@ -116,10 +116,12 @@ def main(args):
 
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
-        
-        print(green('partseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        print_kv('Learning rate:', lr)
+        print(green('semseg'),
+            yellow('model:'), blue(args.model_name),
+            yellow('gpu:'), blue(args.gpu),
+            yellow('epoch:'), '%d/%s' % (epoch, args.epoch),
+            yellow('lr:'), lr)
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -171,9 +173,9 @@ def main(args):
         if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
 
-        print('Best accuracy is: %.5f'%best_acc)
-        print('Best class avg mIOU is: %.5f'%best_class_avg_iou)
-        print('Best inctance avg mIOU is: %.5f'%best_inctance_avg_iou)
+        print_kv('Best accuracy:', best_acc)
+        print_kv('Best class avg mIOU:', best_class_avg_iou)
+        print_kv('Best inctance avg mIOU:', best_inctance_avg_iou)
 
 
 if __name__ == '__main__':

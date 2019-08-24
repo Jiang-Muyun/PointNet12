@@ -107,10 +107,13 @@ def main(args):
 
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
-        print(green('semseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        print('Learning rate:%f' % lr)
-
+        print(green('semseg'),
+            yellow('model:'), blue(args.model_name),
+            yellow('gpu:'), blue(args.gpu),
+            yellow('epoch:'), '%d/%s' % (epoch, args.epoch),
+            yellow('lr:'), lr)
+        
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
