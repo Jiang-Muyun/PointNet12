@@ -3,7 +3,9 @@ import os
 from torch.utils.data import Dataset
 import numpy as np
 import h5py
-from ..colors import *
+import sys
+sys.path.append('.')
+from colors import *
 
 classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
 class2label = {cls: i for i,cls in enumerate(classes)}

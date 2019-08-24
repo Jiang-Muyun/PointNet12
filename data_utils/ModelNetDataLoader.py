@@ -4,7 +4,9 @@ import h5py
 from torch.utils.data import Dataset
 warnings.filterwarnings('ignore')
 
-from ..colors import *
+import sys
+sys.path.append('.')
+from colors import *
 
 def load_h5(h5_filename):
     print_debug(h5_filename)
