@@ -1,12 +1,12 @@
 import argparse
 import os
+import time
+import datetime
 import torch
 import torch.nn.parallel
 import torch.utils.data
 import torch.nn.functional as F
 from data_utils.ModelNetDataLoader import ModelNetDataLoader, load_data
-import datetime
-import logging
 from pathlib import Path
 from tqdm import tqdm
 from utils import test, save_checkpoint, select_avaliable
@@ -138,6 +138,7 @@ def main(args):
         
         print_debug('clear cuda cache')
         torch.cuda.empty_cache()
+        time.sleep(0.05)
 
         train_acc = test(model.eval(), trainDataLoader) if args.train_metric else None
         acc = test(model, testDataLoader)

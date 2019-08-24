@@ -9,7 +9,6 @@ from torch.autograd import Variable
 from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class2label
 import torch.nn.functional as F
 import datetime
-import logging
 from pathlib import Path
 from utils import test_semseg, select_avaliable
 from colors import *
