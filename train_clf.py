@@ -51,7 +51,6 @@ def main(args):
     checkpoints_dir = './experiment/clf/%s/'%(args.model_name)
     os.makedirs(checkpoints_dir, exist_ok=True)
 
-
     '''DATA LOADING'''
     print('Load dataset ...')
     train_data, train_label, test_data, test_label = load_data(root, classification=True)
@@ -68,27 +67,27 @@ def main(args):
 
     '''MODEL LOADING'''
     num_class = 40
-    classifier = PointNetCls(num_class,args.feature_transform).cuda() if args.model_name == 'pointnet' else PointNet2ClsMsg().cuda()
+    model = PointNetCls(num_class,args.feature_transform).cuda() if args.model_name == 'pointnet' else PointNet2ClsMsg().cuda()
     if args.pretrain is not None:
         print('Use pretrain model...')
         checkpoint = torch.load(args.pretrain)
         start_epoch = checkpoint['epoch']
-        classifier.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model_state_dict'])
     else:
         print('No existing model, starting training from scratch...')
         start_epoch = 0
 
-
     if args.optimizer == 'SGD':
-        optimizer = torch.optim.SGD(classifier.parameters(), lr=0.01, momentum=0.9)
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     elif args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(
-            classifier.parameters(),
+            model.parameters(),
             lr=args.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-08,
             weight_decay=args.decay_rate
         )
+
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
     global_epoch = 0
     global_step = 0
@@ -107,8 +106,8 @@ def main(args):
             points = points.transpose(2, 1)
             points, target = points.cuda(), target.cuda()
             optimizer.zero_grad()
-            classifier = classifier.train()
-            pred, trans_feat = classifier(points)
+            model = model.train()
+            pred, trans_feat = model(points)
             loss = F.nll_loss(pred, target.long())
             if args.feature_transform and args.model_name == 'pointnet':
                 loss += feature_transform_reguliarzer(trans_feat) * 0.001
@@ -116,8 +115,8 @@ def main(args):
             optimizer.step()
             global_step += 1
 
-        train_acc = test(classifier.eval(), trainDataLoader) if args.train_metric else None
-        acc = test(classifier, testDataLoader)
+        train_acc = test(model.eval(), trainDataLoader) if args.train_metric else None
+        acc = test(model, testDataLoader)
 
         print('\r Loss: %f' % loss.data)
 
@@ -128,9 +127,9 @@ def main(args):
 
         if acc >= best_tst_accuracy:
             best_tst_accuracy = acc
-            fn_pth = 'partseg-%s-%.5f-%04d.pth'%(args.model_name, acc, epoch)
+            fn_pth = 'clf-%s-%.5f-%04d.pth'%(args.model_name, acc, epoch)
             print('Saving model....', fn_pth)
-            torch.save(classifier.state_dict(), os.path.join(checkpoints_dir,fn_pth))
+            torch.save(model.state_dict(), os.path.join(checkpoints_dir,fn_pth))
         global_epoch += 1
     
     print('Best Accuracy: %f'%best_tst_accuracy)

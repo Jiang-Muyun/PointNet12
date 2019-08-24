@@ -43,30 +43,14 @@ def parse_args():
 def main(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu if args.multi_gpu is None else '0,1,2,3'
     '''CREATE DIR'''
-    experiment_dir = Path('./experiment/')
-    experiment_dir.mkdir(exist_ok=True)
+    experiment_dir = './experiment/'
+    os.makedirs(experiment_dir,exist_ok=True)
     
-    file_dir = Path(str(experiment_dir) +'/%sPartSeg-'%args.model_name + str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
-    file_dir.mkdir(exist_ok=True)
-    
-    checkpoints_dir = file_dir
-    checkpoints_dir.mkdir(exist_ok=True)
+    checkpoints_dir = './experiment/partseg/%s/'%(args.model_name)
+    os.makedirs(checkpoints_dir, exist_ok=True)
 
-    log_dir = file_dir
-    log_dir.mkdir(exist_ok=True)
-
-    '''LOG'''
-    args = parse_args()
-    logger = logging.getLogger(args.model_name)
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(str(log_dir) + '/train_%s_partseg.txt'%args.model_name)
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    logger.info('---------------------------------------------------TRANING---------------------------------------------------')
-    logger.info('PARAMETER ...')
-    logger.info(args)
+    print('==> TRANING')
+    print(args)
 
     norm = True if args.model_name == 'pointnet' else False
 
@@ -76,16 +60,15 @@ def main(args):
     ])
 
     train_ds = PartNormalDataset(root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
-    print('---------',len(train_ds))
     dataloader = DataLoader(train_ds, batch_size=args.batchsize, shuffle=True, num_workers=int(args.workers))
     
     test_ds = PartNormalDataset(root,npoints=2048, split='test',normalize=norm,jitter=False)
     testdataloader = DataLoader(test_ds, batch_size=10, shuffle=True, num_workers=int(args.workers))
     
     print("The number of training data is:",len(train_ds))
-    logger.info("The number of training data is:%d",len(train_ds))
+    print("The number of training data is:%d",len(train_ds))
     print("The number of test data is:", len(test_ds))
-    logger.info("The number of test data is:%d", len(test_ds))
+    print("The number of test data is:%d", len(test_ds))
     num_classes = 16
     num_part = 50
     blue = lambda x: '\033[94m' + x + '\033[0m'
@@ -98,13 +81,12 @@ def main(args):
     if args.pretrain is not None:
         model.load_state_dict(torch.load(args.pretrain))
         print('load model %s'%args.pretrain)
-        logger.info('load model %s'%args.pretrain)
+        print('load model %s'%args.pretrain)
     else:
         print('Training from scratch')
-        logger.info('Training from scratch')
+        print('Training from scratch')
     pretrain = args.pretrain
     init_epoch = int(pretrain[-14:-11]) if args.pretrain is not None else 0
-
 
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -169,19 +151,12 @@ def main(args):
         print('==> train_partseg ->', args.model_name)
         print('Epoch %d %s accuracy: %f  Class avg mIOU: %f   Inctance avg mIOU: %f' % (
                  epoch, blue('test'), test_metrics['accuracy'],test_metrics['class_avg_iou'],test_metrics['inctance_avg_iou']))
-
-        logger.info('Epoch %d %s Accuracy: %f  Class avg mIOU: %f   Inctance avg mIOU: %f' % (
-                 epoch, blue('test'), test_metrics['accuracy'],test_metrics['class_avg_iou'],test_metrics['inctance_avg_iou']))
         
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
-            torch.save(
-                model.state_dict(), 
-                '%s/partseg-%s-%.5f-%04d.pth' % (checkpoints_dir, args.model_name, best_acc, epoch)
-            )
-            logger.info(cat_mean_iou)
-            logger.info('Save model..')
-            print('Save model..')
+            fn_pth = 'partseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
+            print('Save model...',fn_pth)
+            torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
             print(cat_mean_iou)
 
         if test_metrics['class_avg_iou'] > best_class_avg_iou:
@@ -191,11 +166,8 @@ def main(args):
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
 
         print('Best accuracy is: %.5f'%best_acc)
-        logger.info('Best accuracy is: %.5f'%best_acc)
         print('Best class avg mIOU is: %.5f'%best_class_avg_iou)
-        logger.info('Best class avg mIOU is: %.5f'%best_class_avg_iou)
         print('Best inctance avg mIOU is: %.5f'%best_inctance_avg_iou)
-        logger.info('Best inctance avg mIOU is: %.5f'%best_inctance_avg_iou)
 
 
 if __name__ == '__main__':
