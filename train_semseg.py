@@ -38,37 +38,22 @@ def parse_args():
 
 def main(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu if args.multi_gpu is None else '0,1,2,3'
-    '''CREATE DIR'''
-    experiment_dir = Path('./experiment/')
-    experiment_dir.mkdir(exist_ok=True)
+
+    experiment_dir = './experiment/'
+    os.makedirs(experiment_dir,exist_ok=True)
     
-    file_dir = Path(str(experiment_dir) +'/%sSemSeg-'%args.model_name+ str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
-    file_dir.mkdir(exist_ok=True)
+    checkpoints_dir = './experiment/semseg/%s/'%(args.model_name)
+    os.makedirs(checkpoints_dir, exist_ok=True)
 
-    checkpoints_dir = file_dir
-    checkpoints_dir.mkdir(exist_ok=True)
-
-    log_dir = file_dir
-    log_dir.mkdir(exist_ok=True)
-
-    '''LOG'''
-    args = parse_args()
-    logger = logging.getLogger(args.model_name)
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(str(log_dir) + '/train_%s_semseg.txt'%args.model_name)
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    logger.info('---------------------------------------------------TRANING---------------------------------------------------')
-    logger.info('PARAMETER ...')
-    logger.info(args)
-    print('Load data...')
+    print('PARAMETER ...')
+    print(args)
 
     root = select_avaliable([
         '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
         '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
     ])
+
+    print('Load data...')
     train_data, train_label, test_data, test_label = recognize_all_data(root, test_area = 5)
 
     dataset = S3DISDataLoader(train_data,train_label)
@@ -88,10 +73,9 @@ def main(args):
     if args.pretrain is not None:
         model.load_state_dict(torch.load(args.pretrain))
         print('load model %s'%args.pretrain)
-        logger.info('load model %s'%args.pretrain)
     else:
         print('Training from scratch')
-        logger.info('Training from scratch')
+
     pretrain = args.pretrain
     init_epoch = int(pretrain[-14:-11]) if args.pretrain is not None else 0
 
@@ -125,8 +109,10 @@ def main(args):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
         print('Learning rate:%f' % lr)
+
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
+        
         for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader),smoothing=0.9):
             points, target = data
             points, target = Variable(points.float()), Variable(target.long())
@@ -134,15 +120,19 @@ def main(args):
             points, target = points.cuda(), target.cuda()
             optimizer.zero_grad()
             model = model.train()
+
             if args.model_name == 'pointnet':
                 pred, trans_feat = model(points)
             else:
                 pred = model(points[:,:3,:],points[:,3:,:])
+
             pred = pred.contiguous().view(-1, num_classes)
             target = target.view(-1, 1)[:, 0]
             loss = F.nll_loss(pred, target)
+
             if args.model_name == 'pointnet':
                 loss += feature_transform_reguliarzer(trans_feat) * 0.001
+
             history['loss'].append(loss.cpu().data.numpy())
             loss.backward()
             optimizer.step()
@@ -151,30 +141,20 @@ def main(args):
         mean_iou = np.mean(cat_mean_iou)
 
         print('==> train_semseg ->', args.model_name)
-        print('Epoch %d  %s accuracy: %f  meanIOU: %f' % (
-                 epoch, blue('test'), test_metrics['accuracy'],mean_iou))
-        logger.info('Epoch %d  %s accuracy: %f  meanIOU: %f' % (
-                 epoch, 'test', test_metrics['accuracy'],mean_iou))
+        print('Epoch %d %s accuracy: %f  meanIOU: %f' % (epoch, blue('test'), test_metrics['accuracy'],mean_iou))
 
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
-            torch.save(
-                model.state_dict(), 
-                '%s/semseg-%s-%.5f-%04d.pth' % (checkpoints_dir,args.model_name, best_acc, epoch)
-            )
-            logger.info(cat_mean_iou)
-            logger.info('Save model..')
-            print('Save model..')
+            fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
+            print('Save model...',fn_pth)            
+            torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
             print(cat_mean_iou)
         
         if mean_iou > best_meaniou:
             best_meaniou = mean_iou
         
         print('Best accuracy is: %.5f'%best_acc)
-        logger.info('Best accuracy is: %.5f'%best_acc)
         print('Best meanIOU is: %.5f'%best_meaniou)
-        logger.info('Best meanIOU is: %.5f'%best_meaniou)
-
 
 if __name__ == '__main__':
     args = parse_args()
