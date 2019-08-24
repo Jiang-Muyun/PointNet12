@@ -12,7 +12,7 @@ import torch.nn.functional as F
 import datetime
 import logging
 from pathlib import Path
-from utils import test_partseg
+from utils import test_partseg, select_avaliable
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSeg_msg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss
@@ -67,11 +67,10 @@ def main(args):
 
     norm = True if args.model_name == 'pointnet' else False
 
-    if os.path.exists('/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'):
-        root = '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
-
-    if os.path.exists('/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'):
-        root = '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
+    root = select_avaliable([
+        '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
+        '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
+    ])
 
     train_ds = PartNormalDataset(root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
     print('---------',len(train_ds))

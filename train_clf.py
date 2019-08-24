@@ -9,7 +9,7 @@ import datetime
 import logging
 from pathlib import Path
 from tqdm import tqdm
-from utils import test, save_checkpoint
+from utils import test, save_checkpoint, select_avaliable
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 
@@ -33,13 +33,11 @@ def parse_args():
 def main(args):
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    # root = './data/ModelNet/'
-
-    if os.path.exists('/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'):
-        root = '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
-
-    if os.path.exists('/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'):
-        root = '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+    
+    root = select_avaliable([
+        '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
+        '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+    ])
 
     if args.rotation is not None:
         ROTATION = (int(args.rotation[0:2]),int(args.rotation[3:5]))

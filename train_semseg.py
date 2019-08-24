@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import datetime
 import logging
 from pathlib import Path
-from utils import test_semseg
+from utils import test_semseg, select_avaliable
 from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
@@ -62,12 +62,10 @@ def main(args):
     logger.info(args)
     print('Load data...')
 
-    if os.path.exists('/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'):
-        root = '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
-
-    if os.path.exists('/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'):
-        root = '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
-
+    root = select_avaliable([
+        '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+        '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
+    ])
     train_data, train_label, test_data, test_label = recognize_all_data(root, test_area = 5)
 
     dataset = S3DISDataLoader(train_data,train_label)
