@@ -149,7 +149,6 @@ def main(args):
             history['loss'].append(loss.cpu().data.numpy())
             loss.backward()
             optimizer.step()
-            break
             
         print_debug('clear cuda cache')
         torch.cuda.empty_cache()
