@@ -12,12 +12,10 @@ import torch.nn.functional as F
 import datetime
 import logging
 from pathlib import Path
-from utils import test_partseg, select_avaliable
+from utils import test_partseg, select_avaliable,red,green,yellow,blue
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSeg_msg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss
-
-blue = lambda x: '\033[94m' + x + '\033[0m'
 
 seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43], 'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46], 'Mug': [36, 37], 'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27], 'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40], 'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
 seg_label_to_cat = {} # {0:Airplane, 1:Airplane, ...49:Table}
@@ -118,7 +116,7 @@ def main(args):
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        print('Learning rate:%f' % lr)
+        print(blue('Learning rate'), yellow(lr))
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -150,7 +148,7 @@ def main(args):
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
-        print('partseg',blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
+        print(green('partseg'),blue(args.model_name),'gpu:',blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
         print(' >',blue('Test Accuracy'),test_metrics['accuracy'])
         print(' >',blue('Class avg mIOU:'),test_metrics['class_avg_iou'])
         print(' >',blue('Inctance avg mIOU:'),test_metrics['inctance_avg_iou'])
@@ -167,6 +165,8 @@ def main(args):
 
         if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
+        
+        torch.cuda.empty_cache()
 
         print('Best accuracy is: %.5f'%best_acc)
         print('Best class avg mIOU is: %.5f'%best_class_avg_iou)

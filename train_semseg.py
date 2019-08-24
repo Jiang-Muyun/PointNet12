@@ -11,12 +11,11 @@ import torch.nn.functional as F
 import datetime
 import logging
 from pathlib import Path
-from utils import test_semseg, select_avaliable
+from utils import test_semseg, select_avaliable, red,green,yellow,blue
 from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 
-blue = lambda x: '\033[94m' + x + '\033[0m'
 seg_classes = class2label
 seg_label_to_cat = {}
 for i,cat in enumerate(seg_classes.keys()):

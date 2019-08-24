@@ -9,11 +9,9 @@ import datetime
 import logging
 from pathlib import Path
 from tqdm import tqdm
-from utils import test, save_checkpoint, select_avaliable
+from utils import test, save_checkpoint, select_avaliable,red,green,yellow,blue
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
-
-blue = lambda x: '\033[94m' + x + '\033[0m'
 
 def parse_args():
     '''PARAMETERS'''
@@ -97,7 +95,7 @@ def main(args):
     '''TRANING'''
     print('Start training...')
     for epoch in range(start_epoch,args.epoch):
-        print('clf',blue(args.model_name),'gpu:',blue(args.gpu),'Epoch:','%d/%s'%(epoch, args.epoch))
+        print(green('clf'),blue(args.model_name),'gpu:',blue(args.gpu),'Epoch:','%d/%s'%(epoch, args.epoch))
 
         scheduler.step()
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):

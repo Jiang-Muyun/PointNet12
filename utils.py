@@ -10,6 +10,11 @@ import datetime
 import pandas as pd
 import torch.nn.functional as F
 
+red = lambda x: '\033[91m' + str(x) + '\033[0m'
+green = lambda x: '\033[92m' + str(x) + '\033[0m'
+yellow = lambda x: '\033[93m' + str(x) + '\033[0m'
+blue = lambda x: '\033[94m' + str(x) + '\033[0m'
+
 def select_avaliable(fn_list):
     for fn in fn_list:
         if os.path.exists(fn):
