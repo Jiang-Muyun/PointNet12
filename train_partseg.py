@@ -12,7 +12,7 @@ from torch.autograd import Variable
 from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
 from pathlib import Path
-from utils import test_partseg, select_avaliable
+from utils import test_partseg, select_avaliable, mkdir
 from colors import *
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSeg_msg_one_hot
@@ -43,14 +43,9 @@ def parse_args():
 def main(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu if args.multi_gpu is None else '0,1,2,3'
     '''CREATE DIR'''
-    experiment_dir = './experiment/'
-    os.makedirs(experiment_dir,exist_ok=True)
-    
-    checkpoints_dir = './experiment/partseg/%s/'%(args.model_name)
-    os.makedirs(checkpoints_dir, exist_ok=True)
 
-    print('==> TRANING')
-    print(args)
+    experiment_dir = mkdir('./experiment/')
+    checkpoints_dir = mkdir('./experiment/partseg/%s/'%(args.model_name))
 
     norm = True if args.model_name == 'pointnet' else False
 

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from data_utils.ModelNetDataLoader import ModelNetDataLoader, load_data
 from pathlib import Path
 from tqdm import tqdm
-from utils import test, save_checkpoint, select_avaliable
+from utils import test, save_checkpoint, select_avaliable, mkdir
 from colors import *
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
@@ -39,11 +39,8 @@ def main(args):
         '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
     ])
 
-    experiment_dir = './experiment/'
-    os.makedirs(experiment_dir,exist_ok=True)
-
-    checkpoints_dir = './experiment/clf/%s/'%(args.model_name)
-    os.makedirs(checkpoints_dir, exist_ok=True)
+    experiment_dir = mkdir('./experiment/')
+    checkpoints_dir = mkdir('./experiment/clf/%s/'%(args.model_name))
 
     print_info('Loading dataset ...')
     train_data, train_label, test_data, test_label = load_data(dataset_root, classification=True)

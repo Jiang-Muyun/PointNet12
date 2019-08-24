@@ -11,6 +11,10 @@ import pandas as pd
 import torch.nn.functional as F
 from colors import *
 
+def mkdir(fn):
+    os.makedirs(fn, exist_ok=True)
+    return fn
+
 def select_avaliable(fn_list):
     for fn in fn_list:
         if os.path.exists(fn):
