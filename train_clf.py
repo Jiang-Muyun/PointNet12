@@ -130,7 +130,7 @@ def main(args):
             best_tst_accuracy = acc
             fn_pth = 'partseg-%s-%.5f-%04d.pth'%(args.model_name, acc, epoch)
             print('Saving model....', fn_pth)
-            torch.save(model.state_dict(), os.path.join(checkpoints_dir,fn_pth))
+            torch.save(classifier.state_dict(), os.path.join(checkpoints_dir,fn_pth))
         global_epoch += 1
     
     print('Best Accuracy: %f'%best_tst_accuracy)
