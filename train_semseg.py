@@ -16,6 +16,7 @@ from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 
+blue = lambda x: '\033[94m' + x + '\033[0m'
 seg_classes = class2label
 seg_label_to_cat = {}
 for i,cat in enumerate(seg_classes.keys()):
@@ -64,7 +65,6 @@ def main(args):
                                                  shuffle=True, num_workers=int(args.workers))
 
     num_classes = 13
-    blue = lambda x: '\033[94m' + x + '\033[0m'
     if args.model_name == 'pointnet2':
         model = PointNet2SemSeg(num_classes) 
     else:

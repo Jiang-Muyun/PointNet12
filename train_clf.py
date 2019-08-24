@@ -13,6 +13,7 @@ from utils import test, save_checkpoint, select_avaliable
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 
+blue = lambda x: '\033[94m' + x + '\033[0m'
 
 def parse_args():
     '''PARAMETERS'''
@@ -92,12 +93,11 @@ def main(args):
     global_epoch = 0
     global_step = 0
     best_tst_accuracy = 0.0
-    blue = lambda x: '\033[94m' + x + '\033[0m'
 
     '''TRANING'''
     print('Start training...')
     for epoch in range(start_epoch,args.epoch):
-        print('==> train_clf ->', args.model_name, 'Epoch %d (%d/%s):' % (global_epoch + 1, epoch + 1, args.epoch))
+        print('==> train_clf: %s gpu:%s',blue(args.model_name),blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
 
         scheduler.step()
         for batch_id, data in tqdm(enumerate(trainDataLoader, 0), total=len(trainDataLoader), smoothing=0.9):
@@ -118,12 +118,10 @@ def main(args):
         train_acc = test(model.eval(), trainDataLoader) if args.train_metric else None
         acc = test(model, testDataLoader)
 
-        print('\r Loss: %f' % loss.data)
-
+        print(blue('loss'), loss.data)
+        print(blue('Test Accuracy'), acc)
         if args.train_metric:
-            print('Train Accuracy:', train_acc)
-
-        print('\r Test %s: %f' % (blue('Accuracy'),acc))
+            print(blue('Train Accuracy'), train_acc)
 
         if acc >= best_tst_accuracy:
             best_tst_accuracy = acc

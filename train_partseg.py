@@ -17,6 +17,8 @@ from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSeg_msg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss
 
+blue = lambda x: '\033[94m' + x + '\033[0m'
+
 seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43], 'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46], 'Mug': [36, 37], 'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27], 'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40], 'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
 seg_label_to_cat = {} # {0:Airplane, 1:Airplane, ...49:Table}
 for cat in seg_classes.keys():
@@ -59,8 +61,6 @@ def main(args):
         '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
     ])
 
-    print(root)
-
     train_ds = PartNormalDataset(root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
     dataloader = DataLoader(train_ds, batch_size=args.batchsize, shuffle=True, num_workers=int(args.workers))
     
@@ -72,7 +72,6 @@ def main(args):
 
     num_classes = 16
     num_part = 50
-    blue = lambda x: '\033[94m' + x + '\033[0m'
 
     if args.model_name == 'pointnet2':
         model = PointNet2PartSeg_msg_one_hot(num_part) 
@@ -120,7 +119,7 @@ def main(args):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
         print('Learning rate:%f' % lr)
-        
+
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
@@ -150,10 +149,11 @@ def main(args):
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
-        print('==> train_partseg ->', args.model_name)
-        print('Epoch %d %s accuracy: %f  Class avg mIOU: %f   Inctance avg mIOU: %f' % (
-                 epoch, blue('test'), test_metrics['accuracy'],test_metrics['class_avg_iou'],test_metrics['inctance_avg_iou']))
-        
+        print('==> train_partseg: %s gpu:%s',blue(args.model_name),blue(args.gpu), 'Epoch %d/%s:' % (epoch, args.epoch))
+        print(' >',blue('Test Accuracy'),test_metrics['accuracy'])
+        print(' >',blue('Class avg mIOU:'),test_metrics['class_avg_iou'])
+        print(' >',blue('Inctance avg mIOU:'),test_metrics['inctance_avg_iou'])
+
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
             fn_pth = 'partseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
