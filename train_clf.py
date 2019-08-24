@@ -16,7 +16,6 @@ from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 
 def parse_args():
-    '''PARAMETERS'''
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', default='pointnet2', help='pointnet or pointnet2')
     parser.add_argument('--batchsize', type=int, default=24, help='batch size in training')
@@ -65,7 +64,11 @@ def main(args):
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batchsize, shuffle=False)
 
     num_class = 40
-    model = PointNetCls(num_class,args.feature_transform).cuda() if args.model_name == 'pointnet' else PointNet2ClsMsg().cuda()
+    if args.model_name == 'pointnet':
+        model = PointNetCls(num_class,args.feature_transform).cuda()  
+    else:
+        model = PointNet2ClsMsg().cuda()
+
     if args.pretrain is not None:
         print_info('Use pretrain model...')
         checkpoint = torch.load(args.pretrain)

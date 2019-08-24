@@ -116,7 +116,7 @@ def main(args):
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        print(green('semseg'),
+        print(green('partseg'),
             yellow('model:'), blue(args.model_name),
             yellow('gpu:'), blue(args.gpu),
             yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch)),
@@ -149,7 +149,8 @@ def main(args):
             history['loss'].append(loss.cpu().data.numpy())
             loss.backward()
             optimizer.step()
-
+            break
+            
         print_debug('clear cuda cache')
         torch.cuda.empty_cache()
         time.sleep(0.05)

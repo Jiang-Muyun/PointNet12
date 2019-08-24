@@ -109,6 +109,7 @@ def test_partseg(model, loader, catdict, num_classes = 50,forpointnet2=False):
     metrics = defaultdict(lambda:list())
     hist_acc = []
     # mean_correct = []
+    
     for batch_id, (points, label, target, norm_plt) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
         batchsize, num_point,_= points.size()
         points, label, target, norm_plt = Variable(points.float()),Variable(label.long()), Variable(target.long()),Variable(norm_plt.float())
@@ -122,6 +123,7 @@ def test_partseg(model, loader, catdict, num_classes = 50,forpointnet2=False):
             # labels_pred_choice = labels_pred.data.max(1)[1]
             # labels_correct = labels_pred_choice.eq(label.long().data).cpu().sum()
             # mean_correct.append(labels_correct.item() / float(points.size()[0]))
+        
         # print(pred.size())
         iou_tabel, iou = compute_cat_iou(seg_pred,target,iou_tabel)
         iou_list+=iou
@@ -131,11 +133,13 @@ def test_partseg(model, loader, catdict, num_classes = 50,forpointnet2=False):
         pred_choice = seg_pred.data.max(1)[1]
         correct = pred_choice.eq(target.data).cpu().sum()
         metrics['accuracy'].append(correct.item()/ (batchsize * num_point))
+
     iou_tabel[:,2] = iou_tabel[:,0] /iou_tabel[:,1]
     hist_acc += metrics['accuracy']
     metrics['accuracy'] = np.mean(hist_acc)
     metrics['inctance_avg_iou'] = np.mean(iou_list)
     # metrics['label_accuracy'] = np.mean(mean_correct)
+
     iou_tabel = pd.DataFrame(iou_tabel,columns=['iou','count','mean_iou'])
     iou_tabel['Category_IOU'] = [catdict[i] for i in range(len(catdict)) ]
     cat_iou = iou_tabel.groupby('Category_IOU')['mean_iou'].mean()

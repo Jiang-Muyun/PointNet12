@@ -156,8 +156,8 @@ def main(args):
         )
         mean_iou = np.mean(cat_mean_iou)
 
-        print_kv('Test accuracy',test_metrics['accuracy'])
-        print_kv('Test meanIOU',mean_iou)
+        print_kv('Test accuracy','%.5f' % (test_metrics['accuracy']))
+        print_kv('Test meanIOU','%.5f' % (mean_iou))
 
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
