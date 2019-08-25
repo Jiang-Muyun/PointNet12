@@ -5,6 +5,7 @@ __pycache__/
 .vscode/
 data/
 experiment/
+pretrain/
 
 # C extensions
 *.so

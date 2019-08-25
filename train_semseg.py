@@ -26,7 +26,8 @@ for i,cat in enumerate(seg_classes.keys()):
 def parse_args():
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', type=str, default='pointnet2', help='pointnet or pointnet2')
-    parser.add_argument('--batchsize', type=int, default=32, help='input batch size')
+    parser.add_argument('--mode', default='train', help='train or eval')
+    parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
@@ -52,10 +53,10 @@ def train(args):
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
 
     dataset = S3DISDataLoader(train_data,train_label)
-    dataloader = DataLoader(dataset, batch_size=args.batchsize,shuffle=True, num_workers=int(args.workers))
+    dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
     
     test_dataset = S3DISDataLoader(test_data,test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batchsize,shuffle=True, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
 
     num_classes = 13
     if args.model_name == 'pointnet2':
@@ -161,7 +162,56 @@ def train(args):
         print_kv('Best accuracy:' , '%.5f' % (best_acc))
         print_kv('Best meanIOU:','%.5f' % (best_meaniou))
 
+
+def evaluate(args):
+    dataset_root = select_avaliable([
+        '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+        '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
+    ])
+
+    print_info('Loading data...')
+    train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
+    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
+    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+
+    dataset = S3DISDataLoader(train_data,train_label)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
+    
+    test_dataset = S3DISDataLoader(test_data,test_label)
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
+
+    print_kv('Building Model', args.model_name)
+    num_classes = 13
+    if args.model_name == 'pointnet2':
+        model = PointNet2SemSeg(num_classes) 
+    else:
+        model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
+
+    if args.pretrain is None:
+        print_err('No pretrain model')
+        return
+
+    print_info('Loading pretrain model...')
+    checkpoint = torch.load(args.pretrain)
+    model.load_state_dict(checkpoint)
+    model.cuda()
+
+    test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
+        model.eval(), 
+        testdataloader, 
+        seg_label_to_cat,
+        num_classes = num_classes,
+        pointnet2 = args.model_name == 'pointnet2'
+    )
+    mean_iou = np.mean(cat_mean_iou)
+
+    print_kv('Test accuracy','%.5f' % (test_metrics['accuracy']))
+    print_kv('Test meanIOU','%.5f' % (mean_iou))
+
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    train(args)
+    if args.mode == "train":
+        train(args)
+    else:
+        evaluate(args)

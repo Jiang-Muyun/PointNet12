@@ -14,10 +14,8 @@ def print_kv(*kv):
 def print_info(msg, end='\n'):
     print(green(msg), end=end)
 
-
 def print_debug(msg, end='\n'):
     print(grey(msg), end=end)
-
 
 def print_err(msg, end='\n'):
     print(red(msg), end=end)

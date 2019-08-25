@@ -20,7 +20,7 @@ def parse_args():
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', default='pointnet2', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
-    parser.add_argument('--batchsize', type=int, default=24, help='batch size in training')
+    parser.add_argument('--batch_size', type=int, default=24, help='batch size in training')
     parser.add_argument('--epoch',  default=100, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
@@ -53,10 +53,10 @@ def train(args):
         ROTATION = None
 
     trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
-    trainDataLoader = DataLoader(trainDataset, batch_size=args.batchsize, shuffle=True)
+    trainDataLoader = DataLoader(trainDataset, batch_size=args.batch_size, shuffle=True)
 
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=ROTATION)
-    testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batchsize, shuffle=False)
+    testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
     print_kv('Building Model',args.model_name)
     if args.model_name == 'pointnet':
@@ -159,7 +159,7 @@ def evaluate(args):
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
     
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=args.rotation)
-    testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batchsize, shuffle=False)
+    testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
     print_kv('Building Model',args.model_name)
     if args.model_name == 'pointnet':
@@ -175,24 +175,24 @@ def evaluate(args):
     print_info('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
-
     model.eval()
 
     mean_correct = []
-    for j, data in enumerate(testDataLoader, 0):
+    for j, data in tqdm(enumerate(testDataLoader, 0)):
         points, target = data
         target = target[:, 0]
         points = points.transpose(2, 1)
         points, target = points.cuda(), target.cuda()
         pred, _ = model(points)
         pred_choice = pred.data.max(1)[1]
-        # print_kv('pred',pred.shape,'pred_choice',pred_choice.shape)
         correct = pred_choice.eq(target.long().data).cpu().sum()
-        # print_kv('points',points.shape,'target',target.shape, 'correct',correct.numpy())
         mean_correct.append(correct.item()/float(points.size()[0]))
-        print_kv('>',j,'Test Accuracy','%.5f' % (np.mean(mean_correct)))
-        gt = target.long().cpu().numpy()
-        prediction = pred_choice.cpu().numpy()
+
+        # print_kv('pred',pred.shape,'pred_choice',pred_choice.shape)
+        # print_kv('points',points.shape,'target',target.shape, 'correct',correct.numpy())
+        # print_kv('>',j,'Test Accuracy','%.5f' % (np.mean(mean_correct)))
+        # gt = target.long().cpu().numpy()
+        # prediction = pred_choice.cpu().numpy()
 
     print_kv('Test Accuracy','%.5f' % (np.mean(mean_correct)))
 

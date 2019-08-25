@@ -27,7 +27,8 @@ for cat in seg_classes.keys():
 def parse_args():
     parser = argparse.ArgumentParser('PointNet2')
     parser.add_argument('--model_name', type=str, default='pointnet2', help='pointnet or pointnet2')
-    parser.add_argument('--batchsize', type=int, default=32, help='input batch size')
+    parser.add_argument('--mode', default='train', help='train or eval')
+    parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
@@ -36,7 +37,6 @@ def parse_args():
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--jitter', default=False, help="randomly jitter point cloud")
-
     return parser.parse_args()
 
 def train(args):
@@ -51,10 +51,10 @@ def train(args):
     ])
 
     train_ds = PartNormalDataset(dataset_root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
-    dataloader = DataLoader(train_ds, batch_size=args.batchsize, shuffle=True, num_workers=int(args.workers))
+    dataloader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
     
     test_ds = PartNormalDataset(dataset_root,npoints=2048, split='test',normalize=norm,jitter=False)
-    testdataloader = DataLoader(test_ds, batch_size=args.batchsize, shuffle=True, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
     
     print_kv("The number of training data is:",len(train_ds))
     print_kv("The number of test data is:", len(test_ds))
@@ -145,9 +145,9 @@ def train(args):
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
-        print_kv('Test Accuracy',test_metrics['accuracy'])
-        print_kv('Class avg mIOU:',test_metrics['class_avg_iou'])
-        print_kv('Inctance avg mIOU:',test_metrics['inctance_avg_iou'])
+        print_kv('Test Accuracy', '%.5f' % test_metrics['accuracy'])
+        print_kv('Class avg mIOU:', '%.5f' % test_metrics['class_avg_iou'])
+        print_kv('Inctance avg mIOU:', '%.5f' % test_metrics['inctance_avg_iou'])
 
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
@@ -166,9 +166,47 @@ def train(args):
         print_kv('Best class avg mIOU:', '%.5f'%(best_class_avg_iou))
         print_kv('Best inctance avg mIOU:', '%.5f'%(best_inctance_avg_iou))
 
+def evaluate(args):
+    norm = True if args.model_name == 'pointnet' else False
+    dataset_root = select_avaliable([
+        '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
+        '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
+    ])
+    test_ds = PartNormalDataset(dataset_root, npoints=2048, split='test', normalize=norm, jitter=False)
+    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
+    print_kv("The number of test data is:", len(test_ds))
+
+    print_kv('Building Model', args.model_name)
+    num_classes = 16
+    num_part = 50
+    if args.model_name == 'pointnet2':
+        model = PointNet2PartSeg_msg_one_hot(num_part) 
+    else:
+        model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
+
+    if args.pretrain is None:
+        print_err('No pretrain model')
+        return
+
+    print_info('Loading pretrain model...')
+    checkpoint = torch.load(args.pretrain)
+    model.load_state_dict(checkpoint)
+    model.cuda()
+
+    print_info('Testing pretrain model...')
+    forpointnet2 = args.model_name == 'pointnet2'
+    test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat, num_part, forpointnet2)
+
+    print_kv('test_hist_acc',len(test_hist_acc))
+    print_info(cat_mean_iou)
+    print_kv('Test Accuracy','%.5f' % test_metrics['accuracy'])
+    print_kv('Class avg mIOU:','%.5f' % test_metrics['class_avg_iou'])
+    print_kv('Inctance avg mIOU:','%.5f' % test_metrics['inctance_avg_iou'])
 
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    train(args)
-
+    if args.mode == "train":
+        train(args)
+    else:
+        evaluate(args)
