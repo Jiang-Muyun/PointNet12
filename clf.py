@@ -184,6 +184,7 @@ def vis(args):
         point_np = test_data[idx]
         gt_index = test_label[idx]
 
+        print_kv('pt',point_np.shape,'type',point_np.dtype)
         point_cloud = open3d.geometry.PointCloud()
         point_cloud.points = open3d.utility.Vector3dVector(point_np)
 

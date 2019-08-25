@@ -1,7 +1,9 @@
+import open3d
 import argparse
 import os
 import time
 import datetime
+import numpy as np
 from matplotlib import pyplot as plt
 import torch
 import torch.nn.parallel
@@ -206,25 +208,65 @@ def vis(args):
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
     print_kv("The number of test data is:", len(test_ds))
 
-    cmap = plt.cm.get_cmap("hsv", 10)
-    cmap = np.array([cmap(i) for i in range(10)])[:, :3]
+    print_kv('Building Model', args.model_name)
+    num_classes = 16
+    num_part = 50
+    if args.model_name == 'pointnet2':
+        model = PointNet2PartSeg_msg_one_hot(num_part) 
+    else:
+        model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
 
-    batch_point,batch_gt = next(iter(testdataloader,0))
-    for idx in range(10):
-        point, gt = batch_point[idx], batch_gt[idx]
-        print_kv('point',point.size(),'gt',gt.size())
-        gt_color = cmap[gt.numpy() - 1, :] 
+    if args.pretrain is None:
+        print_err('No pretrain model')
+        return
 
-        point_cloud = open3d.geometry.PointCloud()
-        point_cloud.points = open3d.utility.Vector3dVector(point.numpy())
-        point_cloud.colors = open3d.Vector3dVector(gt)
+    print_info('Loading pretrain model...')
+    checkpoint = torch.load(args.pretrain)
+    model.load_state_dict(checkpoint)
+    model.cuda()
 
-        vis = open3d.visualization.Visualizer()
-        vis.create_window()
-        vis.get_render_option().background_color = np.asarray([0, 0, 0])
-        vis.add_geometry(point_cloud)
-        vis.run()
-        vis.destroy_window()
+    for batch_id, (points, label, target, norm_plt) in enumerate(testdataloader):
+        batchsize, num_point, _= points.size()
+        points, label, target, norm_plt = Variable(points.float()),Variable(label.long()), Variable(target.long()),Variable(norm_plt.float())
+        points = points.transpose(2, 1)
+        norm_plt = norm_plt.transpose(2, 1)
+        points, label, target, norm_plt = points.cuda(), label.squeeze().cuda(), target.cuda(), norm_plt.cuda()
+        if args.model_name == 'pointnet2':
+            seg_pred = model(points, norm_plt, to_categorical(label, 16))
+        else:
+            labels_pred, seg_pred, _  = model(points,to_categorical(label,16))
+
+        print_kv('seg_pred',seg_pred.shape)
+        pred_choice = seg_pred.max(-1)[1]
+        print_kv('pred_choice',pred_choice.shape)
+
+        cmap = plt.cm.get_cmap("hsv", 10)
+        cmap = np.array([cmap(i) for i in range(50)])[:, :3]
+
+        print_kv('points',points.shape,'label',label.shape,'target',target.shape,'norm_plt',norm_plt.shape)
+        print_info('Press space to exit, press Q for next frame')
+        def key_callback(vis):
+            exit()
+        for idx in range(batchsize):
+            pt, gt, pred = points[idx].transpose(1, 0), target[idx], pred_choice[idx].transpose(-1, 0)
+            # print_kv('pt',pt.size(),'gt',gt.size(),'pred',pred.shape)
+
+            gt_color = cmap[gt.cpu().numpy() - 1, :]
+            pred_color = cmap[pred.cpu().numpy() - 1, :]
+
+            point_cloud = open3d.geometry.PointCloud()
+            point_cloud.points = open3d.utility.Vector3dVector(pt.cpu().numpy())
+            point_cloud.colors = open3d.Vector3dVector(pred_color)
+
+            vis = open3d.visualization.VisualizerWithKeyCallback()
+            vis.create_window()
+            vis.get_render_option().background_color = np.asarray([0, 0, 0])
+            vis.add_geometry(point_cloud)
+
+            vis.register_key_callback(32, key_callback)
+            vis.run()
+            vis.destroy_window()
+
 
 if __name__ == '__main__':
     args = parse_args()

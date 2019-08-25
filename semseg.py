@@ -5,6 +5,7 @@ import torch
 import time
 import datetime
 import numpy as np
+from matplotlib import pyplot as plt
 import torch.nn.parallel
 import torch.utils.data
 from torch.utils.data import DataLoader
@@ -36,17 +37,17 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
-
     return parser.parse_args()
+
+dataset_root = select_avaliable([
+    '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+    '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+    '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
+])
 
 def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/semseg/%s/'%(args.model_name))
-
-    dataset_root = select_avaliable([
-        '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
-        '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
-    ])
 
     print_info('Loading data...')
     train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
@@ -165,19 +166,10 @@ def train(args):
 
 
 def evaluate(args):
-    dataset_root = select_avaliable([
-        '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
-        '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
-        '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
-    ])
-
     print_info('Loading data...')
     train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
     print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
-
-    print_kv('test_data',test_data[0][0])
-    return
 
     dataset = S3DISDataLoader(train_data,train_label)
     dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
@@ -214,7 +206,70 @@ def evaluate(args):
     print_kv('Test meanIOU','%.5f' % (mean_iou))
 
 def vis(args):
-    pass
+    print_info('Loading data...')
+    train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
+    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
+
+    test_dataset = S3DISDataLoader(test_data,test_label)
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
+
+    print_kv('Building Model', args.model_name)
+    num_classes = 13
+    if args.model_name == 'pointnet2':
+        model = PointNet2SemSeg(num_classes) 
+    else:
+        model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
+
+    if args.pretrain is None:
+        print_err('No pretrain model')
+        return
+
+    print_info('Loading pretrain model...')
+    checkpoint = torch.load(args.pretrain)
+    model.load_state_dict(checkpoint)
+    model.cuda().eval()
+
+    for batch_id, (points, target) in enumerate(testdataloader):
+        batchsize, num_point, _ = points.size()
+        points, target = Variable(points.float()), Variable(target.long())
+        points = points.transpose(2, 1)
+        points, target = points.cuda(), target.cuda()
+        if args.model_name == 'pointnet2':
+            pred = model(points[:, :3, :], points[:, 3:, :])
+        else:
+            pred, _ = model(points)
+
+        points = points[:, :3, :]
+        print_kv('points',points.shape, 'pred',pred.shape,'target',target.shape)
+        pred_choice = pred.data.max(-1)[1]
+        print_kv('pred_choice',pred_choice.shape)
+
+        cmap = plt.cm.get_cmap("hsv", 10)
+        cmap = np.array([cmap(i) for i in range(50)])[:, :3]
+
+        print_info('Press space to exit, press Q for next frame')
+        def key_callback(vis):
+            exit()
+
+        for idx in range(batchsize):
+            pt, gt, pred = points[idx].transpose(-1, 0), target[idx], pred_choice[idx]
+            print_kv('pt',pt.size(),'gt',gt.size(),'pred',pred.shape)
+
+            gt_color = cmap[gt.cpu().numpy() - 1, :]
+            pred_color = cmap[pred.cpu().numpy() - 1, :]
+
+            point_cloud = open3d.geometry.PointCloud()
+            point_cloud.points = open3d.utility.Vector3dVector(pt.cpu().numpy())
+            point_cloud.colors = open3d.Vector3dVector(pred_color)
+
+            vis = open3d.visualization.VisualizerWithKeyCallback()
+            vis.create_window()
+            vis.get_render_option().background_color = np.asarray([0, 0, 0])
+            vis.add_geometry(point_cloud)
+
+            vis.register_key_callback(32, key_callback)
+            vis.run()
+            vis.destroy_window()
 
 if __name__ == '__main__':
     args = parse_args()
