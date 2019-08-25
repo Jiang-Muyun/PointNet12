@@ -5,4 +5,4 @@ python train_partseg.py --model_name pointnet --gpu 0 --batchsize 32
 python train_partseg.py --model_name pointnet2 --gpu 2 --batchsize 10
 
 python train_semseg.py --model_name pointnet --gpu 0 --batchsize 24
-python train_semseg.py --model_name pointnet2 --gpu 0 --batchsize 10
+python train_semseg.py --model_name pointnet2 --gpu 0 --batchsize 12

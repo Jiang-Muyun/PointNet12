@@ -31,7 +31,6 @@ def parse_args():
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
-    parser.add_argument('--multi_gpu', type=str, default=None, help='whether use multi gpu training')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
@@ -84,7 +83,7 @@ def main(args):
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
     LEARNING_RATE_CLIP = 1e-5
 
-    device_ids = [int(x) for x in args.multi_gpu.split(',')]
+    device_ids = [int(x) for x in args.gpu.split(',')]
     if len(device_ids) >= 2:
         torch.backends.cudnn.benchmark = True
         model.cuda(device_ids[0])

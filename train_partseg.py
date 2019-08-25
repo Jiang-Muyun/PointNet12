@@ -88,7 +88,7 @@ def main(args):
             
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
-    device_ids = [int(x) for x in args.multi_gpu.split(',')]
+    device_ids = [int(x) for x in args.gpu.split(',')]
     if len(device_ids) >= 2:
         torch.backends.cudnn.benchmark = True
         model.cuda(device_ids[0])
