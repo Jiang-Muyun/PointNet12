@@ -11,11 +11,20 @@ def print_kv(*kv):
         print(yellow(kv[i*2]), blue(kv[i*2+1]), end=' ')
     print()
 
-def print_info(msg, end='\n'):
-    print(green(msg), end=end)
+def print_info(*kv, end='\n'):
+    tmp = ''
+    for msg in kv:
+        tmp += green(msg) + ' '
+    print(tmp,end=end)
 
-def print_debug(msg, end='\n'):
-    print(grey(msg), end=end)
+def print_debug(*kv, end='\n'):
+    tmp = ''
+    for msg in kv:
+        tmp += grey(msg) + ' '
+    print(tmp,end=end)
 
-def print_err(msg, end='\n'):
-    print(red(msg), end=end)
+def print_err(*kv, end='\n'):
+    tmp = ''
+    for msg in kv:
+        tmp += red(msg) + ' '
+    print(tmp,end=end)

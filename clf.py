@@ -34,21 +34,34 @@ def parse_args():
     parser.add_argument('--feature_transform', default=False, help="use feature transform in pointnet")
     return parser.parse_args()
 
-dataset_root = select_avaliable([
-    '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-    '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-    '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
-])
 
-def train(args):
-
-    experiment_dir = mkdir('./experiment/')
-    checkpoints_dir = mkdir('./experiment/clf/%s/'%(args.model_name))
-
-    print_info('Loading dataset ...')
-    train_data, train_label, test_data, test_label = load_data(dataset_root, classification=True)
+def _load():
+    dataset_tmp = 'experiment/modelnet40_ply_hdf5_2048.npz'
+    if not os.path.exists(dataset_tmp):
+        print_info('Loading data...')
+        dataset_root = select_avaliable([
+            '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
+            '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
+            '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+        ])
+        train_data, train_label, test_data, test_label = load_data(dataset_root, classification = True)
+        np.savez(dataset_tmp,train_data=train_data,train_label=train_label,
+                                test_data=test_data,test_label=test_label)
+    else:
+        print_info('Loading from npz...')
+        tmp = np.load(dataset_tmp)
+        train_data = tmp['train_data']
+        train_label = tmp['train_label']
+        test_data = tmp['test_data']
+        test_label = tmp['test_label']
     print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+    return train_data, train_label, test_data, test_label
+
+def train(args):
+    experiment_dir = mkdir('./experiment/')
+    checkpoints_dir = mkdir('./experiment/clf/%s/'%(args.model_name))
+    train_data, train_label, test_data, test_label = _load()
     
     if args.rotation is not None:
         ROTATION = (int(args.rotation[0:2]),int(args.rotation[3:5]))
@@ -150,10 +163,7 @@ def train(args):
     print_info('End of training...')
 
 def evaluate(args):
-    print_info('Loading dataset ...')
-    _, _, test_data, test_label = load_data(dataset_root, classification=True, train_data = False)
-    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
-
+    train_data, train_label, test_data, test_label = _load()
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=args.rotation)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
@@ -176,10 +186,11 @@ def evaluate(args):
     print_kv('Test Accuracy','%.5f' % (acc))
 
 def vis(args):
-    print_info('Loading dataset ...')
-    _, _, test_data, test_label = load_data(dataset_root, classification=True, train_data = False)
+    train_data, train_label, test_data, test_label = _load()
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
 
+    print_info('Press space to exit, press Q for next frame')
+    
     for idx in range(test_data.shape[0]):
         point_np = test_data[idx]
         gt_index = test_label[idx]
@@ -188,10 +199,11 @@ def vis(args):
         point_cloud = open3d.geometry.PointCloud()
         point_cloud.points = open3d.utility.Vector3dVector(point_np)
 
-        vis = open3d.visualization.Visualizer()
+        vis = open3d.visualization.VisualizerWithKeyCallback()
         vis.create_window()
         vis.get_render_option().background_color = np.asarray([0, 0, 0])
         vis.add_geometry(point_cloud)
+        vis.register_key_callback(32, lambda vis: exit())
         vis.run()
         vis.destroy_window()
 

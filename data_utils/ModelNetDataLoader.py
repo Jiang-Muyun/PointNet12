@@ -23,18 +23,15 @@ def load_h5(h5_filename):
     seg = []
     return (data, label, seg)
 
-def load_data(path,classification = False, train_data = True):
-    if train_data:
-        data_train0, label_train0, Seglabel_train0  = load_h5(path + 'ply_data_train0.h5')
-        data_train1, label_train1, Seglabel_train1 = load_h5(path + 'ply_data_train1.h5')
-        data_train2, label_train2, Seglabel_train2 = load_h5(path + 'ply_data_train2.h5')
-        data_train3, label_train3, Seglabel_train3 = load_h5(path + 'ply_data_train3.h5')
-        data_train4, label_train4, Seglabel_train4 = load_h5(path + 'ply_data_train4.h5')
-        train_data = np.concatenate([data_train0,data_train1,data_train2,data_train3,data_train4])
-        train_label = np.concatenate([label_train0,label_train1,label_train2,label_train3,label_train4])
-        train_Seglabel = np.concatenate([Seglabel_train0,Seglabel_train1,Seglabel_train2,Seglabel_train3,Seglabel_train4])
-    else:
-        train_data,train_label,train_Seglabel = None,None,None
+def load_data(path,classification = False):
+    data_train0, label_train0, Seglabel_train0  = load_h5(path + 'ply_data_train0.h5')
+    data_train1, label_train1, Seglabel_train1 = load_h5(path + 'ply_data_train1.h5')
+    data_train2, label_train2, Seglabel_train2 = load_h5(path + 'ply_data_train2.h5')
+    data_train3, label_train3, Seglabel_train3 = load_h5(path + 'ply_data_train3.h5')
+    data_train4, label_train4, Seglabel_train4 = load_h5(path + 'ply_data_train4.h5')
+    train_data = np.concatenate([data_train0,data_train1,data_train2,data_train3,data_train4])
+    train_label = np.concatenate([label_train0,label_train1,label_train2,label_train3,label_train4])
+    train_Seglabel = np.concatenate([Seglabel_train0,Seglabel_train1,Seglabel_train2,Seglabel_train3,Seglabel_train4])
 
     data_test0, label_test0, Seglabel_test0 = load_h5(path + 'ply_data_test0.h5')
     data_test1, label_test1, Seglabel_test1 = load_h5(path + 'ply_data_test1.h5')

@@ -43,6 +43,7 @@ def parse_args():
     return parser.parse_args()
 
 dataset_root = select_avaliable([
+    '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
     '/media/james/Ubuntu_Data/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
     '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
     '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
@@ -205,7 +206,7 @@ def evaluate(args):
 def vis(args):
     norm = True if args.model_name == 'pointnet' else False
     test_ds = PartNormalDataset(dataset_root, npoints=2048, split='test', normalize=norm, jitter=False)
-    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
     print_kv("The number of test data is:", len(test_ds))
 
     print_kv('Building Model', args.model_name)
@@ -224,7 +225,7 @@ def vis(args):
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda()
-
+    print_info('Press space to exit, press Q for next frame')
     for batch_id, (points, label, target, norm_plt) in enumerate(testdataloader):
         batchsize, num_point, _= points.size()
         points, label, target, norm_plt = Variable(points.float()),Variable(label.long()), Variable(target.long()),Variable(norm_plt.float())
@@ -235,18 +236,15 @@ def vis(args):
             seg_pred = model(points, norm_plt, to_categorical(label, 16))
         else:
             labels_pred, seg_pred, _  = model(points,to_categorical(label,16))
-
-        print_kv('seg_pred',seg_pred.shape)
         pred_choice = seg_pred.max(-1)[1]
-        print_kv('pred_choice',pred_choice.shape)
+        # print_kv('seg_pred',seg_pred.shape, 'pred_choice',pred_choice.shape)
 
-        cmap = plt.cm.get_cmap("hsv", 10)
-        cmap = np.array([cmap(i) for i in range(50)])[:, :3]
+        cmap_plt = plt.cm.get_cmap("hsv", num_part)
+        cmap_list = [cmap_plt(i)[:3] for i in range(num_part)]
+        np.random.shuffle(cmap_list)
+        cmap = np.array(cmap_list)
 
-        print_kv('points',points.shape,'label',label.shape,'target',target.shape,'norm_plt',norm_plt.shape)
-        print_info('Press space to exit, press Q for next frame')
-        def key_callback(vis):
-            exit()
+        #print_kv('points',points.shape,'label',label.shape,'target',target.shape,'norm_plt',norm_plt.shape)  
         for idx in range(batchsize):
             pt, gt, pred = points[idx].transpose(1, 0), target[idx], pred_choice[idx].transpose(-1, 0)
             # print_kv('pt',pt.size(),'gt',gt.size(),'pred',pred.shape)
@@ -255,20 +253,23 @@ def vis(args):
             pred_color = cmap[pred.cpu().numpy() - 1, :]
 
             point_cloud = open3d.geometry.PointCloud()
-            point_cloud.points = open3d.utility.Vector3dVector(pt.cpu().numpy())
+            point_cloud.points = open3d.Vector3dVector(pt.cpu().numpy())
             point_cloud.colors = open3d.Vector3dVector(pred_color)
 
             vis = open3d.visualization.VisualizerWithKeyCallback()
             vis.create_window()
             vis.get_render_option().background_color = np.asarray([0, 0, 0])
             vis.add_geometry(point_cloud)
-
-            vis.register_key_callback(32, key_callback)
+            vis.register_key_callback(32, lambda vis: exit())
             vis.run()
             vis.destroy_window()
 
 
 if __name__ == '__main__':
+    from data_utils.ShapeNetDataLoader import build_cache
+    build_cache(dataset_root)
+    exit()
+
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.mode == "train":

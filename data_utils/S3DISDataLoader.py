@@ -30,8 +30,8 @@ def recognize_all_data(root, test_area = 5):
     label_batch_list = []
 
     for h5_filename in ALL_FILES:
-        fn = os.path.join(os.path.abspath(os.path.join(root,'..')),h5_filename)
-        data_batch, label_batch = loadDataFile(fn)
+        h5_filename = h5_filename.split('/')[-1]
+        data_batch, label_batch = loadDataFile(os.path.join(root,h5_filename))
         data_batch_list.append(data_batch)
         label_batch_list.append(label_batch)
         

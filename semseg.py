@@ -39,20 +39,35 @@ def parse_args():
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     return parser.parse_args()
 
-dataset_root = select_avaliable([
-    '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
-    '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
-    '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
-])
+def _load():
+    # dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.npz'
+    dataset_tmp = '/media/james/HDD/indoor3d_sem_seg_hdf5_data.npz'
+    if not os.path.exists(dataset_tmp):
+        print_info('Loading data...')
+        dataset_root = select_avaliable([
+            '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+            '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+            '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+            '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
+        ])
+        train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
+        np.savez_compressed(dataset_tmp,train_data=train_data,train_label=train_label,
+                                test_data=test_data,test_label=test_label)
+    else:
+        print_info('Loading from npz...')
+        tmp = np.load(dataset_tmp)
+        train_data = tmp['train_data']
+        train_label = tmp['train_label']
+        test_data = tmp['test_data']
+        test_label = tmp['test_label']
+    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
+    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+    return train_data, train_label, test_data, test_label
 
 def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/semseg/%s/'%(args.model_name))
-
-    print_info('Loading data...')
-    train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
-    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
-    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+    train_data, train_label, test_data, test_label = _load()
 
     dataset = S3DISDataLoader(train_data,train_label)
     dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
@@ -166,10 +181,7 @@ def train(args):
 
 
 def evaluate(args):
-    print_info('Loading data...')
-    train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
-    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
-    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+    train_data, train_label, test_data, test_label = _load()
 
     dataset = S3DISDataLoader(train_data,train_label)
     dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
@@ -206,12 +218,16 @@ def evaluate(args):
     print_kv('Test meanIOU','%.5f' % (mean_iou))
 
 def vis(args):
-    print_info('Loading data...')
-    train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
-    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
+    train_data, train_label, test_data, test_label = _load()
+    print_kv('0-0',train_data[0,0])
+    print_kv('0-1',train_data[0,1])
+    print_kv('0-2',train_data[0,2])
+    print_kv('1-0',train_data[1,0])
+    print_kv('1-1',train_data[1,1])
+    print_kv('1-2',train_data[1,2])
 
     test_dataset = S3DISDataLoader(test_data,test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=False, num_workers=int(args.workers))
 
     print_kv('Building Model', args.model_name)
     num_classes = 13
@@ -228,8 +244,12 @@ def vis(args):
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda().eval()
+    cmap = plt.cm.get_cmap("hsv", 13)
+    cmap = np.array([cmap(i) for i in range(13)])[:, :3]
+    pt_cloud,label_cloud = [],[]
 
     for batch_id, (points, target) in enumerate(testdataloader):
+        print_info('Press space to exit','press Q for next frame')
         batchsize, num_point, _ = points.size()
         points, target = Variable(points.float()), Variable(target.long())
         points = points.transpose(2, 1)
@@ -239,37 +259,40 @@ def vis(args):
         else:
             pred, _ = model(points)
 
-        points = points[:, :3, :]
-        print_kv('points',points.shape, 'pred',pred.shape,'target',target.shape)
+        pt_offset = points[:, :3, :].transpose(-1, 1)
+        points = points[:, :3, :].transpose(-1, 1)
         pred_choice = pred.data.max(-1)[1]
-        print_kv('pred_choice',pred_choice.shape)
-
-        cmap = plt.cm.get_cmap("hsv", 10)
-        cmap = np.array([cmap(i) for i in range(50)])[:, :3]
-
-        print_info('Press space to exit, press Q for next frame')
-        def key_callback(vis):
-            exit()
+        print_kv('pt',points.shape, 'pred',pred.shape,'target',target.shape,'cho',pred_choice.shape)
 
         for idx in range(batchsize):
-            pt, gt, pred = points[idx].transpose(-1, 0), target[idx], pred_choice[idx]
-            print_kv('pt',pt.size(),'gt',gt.size(),'pred',pred.shape)
+            pt, gt, pred = points[idx], target[idx], pred_choice[idx]
+            offset = pt_offset[idx]
+            print_kv('> pt',pt.size(),'gt',gt.size(),'pred',pred.shape,'offset',offset.shape)
 
             gt_color = cmap[gt.cpu().numpy() - 1, :]
             pred_color = cmap[pred.cpu().numpy() - 1, :]
 
-            point_cloud = open3d.geometry.PointCloud()
-            point_cloud.points = open3d.utility.Vector3dVector(pt.cpu().numpy())
-            point_cloud.colors = open3d.Vector3dVector(pred_color)
+            pt_cloud.append((pt+offset).cpu().numpy())
+            label_cloud.append(gt_color)
 
-            vis = open3d.visualization.VisualizerWithKeyCallback()
-            vis.create_window()
-            vis.get_render_option().background_color = np.asarray([0, 0, 0])
-            vis.add_geometry(point_cloud)
+        print_kv('np.array(pt_cloud)',np.array(pt_cloud).shape)
+        print_kv('np.array(label_cloud)',np.array(label_cloud).shape)
+        pt_np = np.array(pt_cloud).reshape((-1,3))
+        label_np = np.array(label_cloud).reshape((-1,3))
+        print_kv('pt_np',pt_np.shape,'label_np',label_np.shape)
 
-            vis.register_key_callback(32, key_callback)
-            vis.run()
-            vis.destroy_window()
+        point_cloud = open3d.geometry.PointCloud()
+        point_cloud.points = open3d.utility.Vector3dVector(pt_np)
+        point_cloud.colors = open3d.Vector3dVector(label_np)
+
+        vis = open3d.visualization.VisualizerWithKeyCallback()
+        vis.create_window()
+        vis.get_render_option().background_color = np.asarray([0, 0, 0])
+        vis.add_geometry(point_cloud)
+
+        vis.register_key_callback(32, lambda vis: exit())
+        vis.run()
+        vis.destroy_window()
 
 if __name__ == '__main__':
     args = parse_args()
