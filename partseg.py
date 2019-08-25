@@ -2,6 +2,7 @@ import argparse
 import os
 import time
 import datetime
+from matplotlib import pyplot as plt
 import torch
 import torch.nn.parallel
 import torch.utils.data
@@ -39,22 +40,22 @@ def parse_args():
     parser.add_argument('--jitter', default=False, help="randomly jitter point cloud")
     return parser.parse_args()
 
+dataset_root = select_avaliable([
+    '/media/james/Ubuntu_Data/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
+    '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
+    '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
+])
+
 def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/partseg/%s/'%(args.model_name))
 
     norm = True if args.model_name == 'pointnet' else False
-
-    dataset_root = select_avaliable([
-        '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
-        '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
-    ])
-
     train_ds = PartNormalDataset(dataset_root,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
     dataloader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
     
     test_ds = PartNormalDataset(dataset_root,npoints=2048, split='test',normalize=norm,jitter=False)
-    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
     
     print_kv("The number of training data is:",len(train_ds))
     print_kv("The number of test data is:", len(test_ds))
@@ -68,13 +69,13 @@ def train(args):
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
 
     if args.pretrain is not None:
+        print_info('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
-        print_info('load model %s'%args.pretrain)
+        init_epoch = int(args.pretrain[:-4].split('-')[-1])
+        print_kv('start epoch from', init_epoch)
     else:
         print_info('Training from scratch')
-
-    pretrain = args.pretrain
-    init_epoch = int(pretrain[-14:-11]) if args.pretrain is not None else 0
+        init_epoch = 0
 
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -168,12 +169,8 @@ def train(args):
 
 def evaluate(args):
     norm = True if args.model_name == 'pointnet' else False
-    dataset_root = select_avaliable([
-        '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
-        '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
-    ])
     test_ds = PartNormalDataset(dataset_root, npoints=2048, split='test', normalize=norm, jitter=False)
-    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
     print_kv("The number of test data is:", len(test_ds))
 
     print_kv('Building Model', args.model_name)
@@ -203,10 +200,38 @@ def evaluate(args):
     print_kv('Class avg mIOU:','%.5f' % test_metrics['class_avg_iou'])
     print_kv('Inctance avg mIOU:','%.5f' % test_metrics['inctance_avg_iou'])
 
+def vis(args):
+    norm = True if args.model_name == 'pointnet' else False
+    test_ds = PartNormalDataset(dataset_root, npoints=2048, split='test', normalize=norm, jitter=False)
+    testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
+    print_kv("The number of test data is:", len(test_ds))
+
+    cmap = plt.cm.get_cmap("hsv", 10)
+    cmap = np.array([cmap(i) for i in range(10)])[:, :3]
+
+    batch_point,batch_gt = next(iter(testdataloader,0))
+    for idx in range(10):
+        point, gt = batch_point[idx], batch_gt[idx]
+        print_kv('point',point.size(),'gt',gt.size())
+        gt_color = cmap[gt.numpy() - 1, :] 
+
+        point_cloud = open3d.geometry.PointCloud()
+        point_cloud.points = open3d.utility.Vector3dVector(point.numpy())
+        point_cloud.colors = open3d.Vector3dVector(gt)
+
+        vis = open3d.visualization.Visualizer()
+        vis.create_window()
+        vis.get_render_option().background_color = np.asarray([0, 0, 0])
+        vis.add_geometry(point_cloud)
+        vis.run()
+        vis.destroy_window()
+
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.mode == "train":
         train(args)
-    else:
+    if args.mode == "eval":
         evaluate(args)
+    if args.mode == "vis":
+        vis(args)

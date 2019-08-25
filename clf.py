@@ -1,8 +1,10 @@
+import open3d
 import argparse
 import os
 import time
 import datetime
 import numpy as np
+from matplotlib import pyplot as plt
 import torch
 import torch.nn.parallel
 import torch.utils.data
@@ -32,11 +34,13 @@ def parse_args():
     parser.add_argument('--feature_transform', default=False, help="use feature transform in pointnet")
     return parser.parse_args()
 
+dataset_root = select_avaliable([
+    '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
+    '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
+    '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+])
+
 def train(args):
-    dataset_root = select_avaliable([
-        '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-        '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
-    ])
 
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/clf/%s/'%(args.model_name))
@@ -67,12 +71,12 @@ def train(args):
 
     if args.pretrain is not None:
         print_info('Use pretrain model...')
-        checkpoint = torch.load(args.pretrain)
-        start_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(torch.load(args.pretrain))
+        init_epoch = int(args.pretrain[:-4].split('-')[-1])
+        print_kv('start epoch from', init_epoch)
     else:
-        print_info('No existing model, starting training from scratch...')
-        start_epoch = 0
+        print_info('Training from scratch')
+        init_epoch = 0
 
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -91,14 +95,14 @@ def train(args):
         print_info('Using multi GPU:',device_ids)
     else:
         model.cuda()
-        print_info('Using single GPU:',device_ids)
+        print_kv('Using single GPU:',device_ids)
 
     global_epoch = 0
     global_step = 0
     best_tst_accuracy = 0.0
 
     print_info('Start training...')
-    for epoch in range(start_epoch,args.epoch):
+    for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
 
@@ -116,6 +120,7 @@ def train(args):
             optimizer.zero_grad()
             model = model.train()
             pred, trans_feat = model(points)
+            # print_kv('points',points.shape,'pred',pred.shape)
             loss = F.nll_loss(pred, target.long())
             if args.feature_transform and args.model_name == 'pointnet':
                 loss += feature_transform_reguliarzer(trans_feat) * 0.001
@@ -145,19 +150,10 @@ def train(args):
     print_info('End of training...')
 
 def evaluate(args):
-    dataset_root = select_avaliable([
-        '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-        '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-        '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
-    ])
-
-    experiment_dir = mkdir('./experiment/')
-    checkpoints_dir = mkdir('./experiment/clf/%s/'%(args.model_name))
-
     print_info('Loading dataset ...')
     _, _, test_data, test_label = load_data(dataset_root, classification=True, train_data = False)
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
-    
+
     testDataset = ModelNetDataLoader(test_data, test_label, rotation=args.rotation)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
@@ -175,31 +171,35 @@ def evaluate(args):
     print_info('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
-    model.eval()
 
-    mean_correct = []
-    for j, data in tqdm(enumerate(testDataLoader, 0)):
-        points, target = data
-        target = target[:, 0]
-        points = points.transpose(2, 1)
-        points, target = points.cuda(), target.cuda()
-        pred, _ = model(points)
-        pred_choice = pred.data.max(1)[1]
-        correct = pred_choice.eq(target.long().data).cpu().sum()
-        mean_correct.append(correct.item()/float(points.size()[0]))
+    acc = test(model.eval(), testDataLoader)
+    print_kv('Test Accuracy','%.5f' % (acc))
 
-        # print_kv('pred',pred.shape,'pred_choice',pred_choice.shape)
-        # print_kv('points',points.shape,'target',target.shape, 'correct',correct.numpy())
-        # print_kv('>',j,'Test Accuracy','%.5f' % (np.mean(mean_correct)))
-        # gt = target.long().cpu().numpy()
-        # prediction = pred_choice.cpu().numpy()
+def vis(args):
+    print_info('Loading dataset ...')
+    _, _, test_data, test_label = load_data(dataset_root, classification=True, train_data = False)
+    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
 
-    print_kv('Test Accuracy','%.5f' % (np.mean(mean_correct)))
+    for idx in range(test_data.shape[0]):
+        point_np = test_data[idx]
+        gt_index = test_label[idx]
+
+        point_cloud = open3d.geometry.PointCloud()
+        point_cloud.points = open3d.utility.Vector3dVector(point_np)
+
+        vis = open3d.visualization.Visualizer()
+        vis.create_window()
+        vis.get_render_option().background_color = np.asarray([0, 0, 0])
+        vis.add_geometry(point_cloud)
+        vis.run()
+        vis.destroy_window()
 
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.mode == "train":
         train(args)
-    else:
+    if args.mode == "eval":
         evaluate(args)
+    if args.mode == "vis":
+        vis(args)

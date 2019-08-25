@@ -1,3 +1,4 @@
+import open3d
 import argparse
 import os
 import torch
@@ -65,13 +66,13 @@ def train(args):
         model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
 
     if args.pretrain is not None:
+        print_info('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
-        print_info('load model %s'%args.pretrain)
+        init_epoch = int(args.pretrain[:-4].split('-')[-1])
+        print_kv('start epoch from', init_epoch)
     else:
         print_info('Training from scratch')
-
-    pretrain = args.pretrain
-    init_epoch = int(pretrain[-14:-11]) if args.pretrain is not None else 0
+        init_epoch = 0
 
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -165,6 +166,7 @@ def train(args):
 
 def evaluate(args):
     dataset_root = select_avaliable([
+        '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
         '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
         '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
     ])
@@ -173,6 +175,9 @@ def evaluate(args):
     train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
     print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+
+    print_kv('test_data',test_data[0][0])
+    return
 
     dataset = S3DISDataLoader(train_data,train_label)
     dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
@@ -208,10 +213,15 @@ def evaluate(args):
     print_kv('Test accuracy','%.5f' % (test_metrics['accuracy']))
     print_kv('Test meanIOU','%.5f' % (mean_iou))
 
+def vis(args):
+    pass
+
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.mode == "train":
         train(args)
-    else:
+    if args.mode == "eval":
         evaluate(args)
+    if args.mode == "vis":
+        vis(args)
