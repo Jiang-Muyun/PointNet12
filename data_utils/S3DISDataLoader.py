@@ -49,8 +49,6 @@ def recognize_all_data(root, test_area = 5):
     train_label = label_batches[train_idxs]
     test_data = data_batches[test_idxs, ...]
     test_label = label_batches[test_idxs]
-    print('train_data',train_data.shape,'train_label' ,train_label.shape)
-    print('test_data',test_data.shape,'test_label', test_label.shape)
     return train_data,train_label,test_data,test_label
 
 

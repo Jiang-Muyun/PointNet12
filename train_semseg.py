@@ -46,8 +46,12 @@ def main(args):
         '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
     ])
 
-    print('Load data...')
+    print_info('Loading data...')
     train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
+    print_kv('train_data',train_data.shape,end=' ')
+    print_kv('train_label' ,train_label.shape)
+    print_kv('test_data',test_data.shape,end=' ')
+    print_kv('test_label', test_label.shape)
 
     dataset = S3DISDataLoader(train_data,train_label)
     dataloader = DataLoader(dataset, batch_size=args.batchsize,shuffle=True, num_workers=int(args.workers))
@@ -63,9 +67,9 @@ def main(args):
 
     if args.pretrain is not None:
         model.load_state_dict(torch.load(args.pretrain))
-        print('load model %s'%args.pretrain)
+        print_info('load model %s'%args.pretrain)
     else:
-        print('Training from scratch')
+        print_info('Training from scratch')
 
     pretrain = args.pretrain
     init_epoch = int(pretrain[-14:-11]) if args.pretrain is not None else 0
@@ -88,10 +92,10 @@ def main(args):
         torch.backends.cudnn.benchmark = True
         model.cuda(device_ids[0])
         model = torch.nn.DataParallel(model, device_ids=device_ids)
-        print_info('Using multi GPU:',device_ids)
+        print_kv('Using multi GPU:',device_ids)
     else:
         model.cuda()
-        print_info('Using single GPU:',device_ids)
+        print_kv('Using single GPU:',device_ids)
 
     history = defaultdict(lambda: list())
     best_acc = 0
