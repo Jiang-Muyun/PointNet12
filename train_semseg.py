@@ -37,7 +37,7 @@ def parse_args():
 
     return parser.parse_args()
 
-def main(args):
+def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/semseg/%s/'%(args.model_name))
 
@@ -48,10 +48,8 @@ def main(args):
 
     print_info('Loading data...')
     train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
-    print_kv('train_data',train_data.shape,end=' ')
-    print_kv('train_label' ,train_label.shape)
-    print_kv('test_data',test_data.shape,end=' ')
-    print_kv('test_label', test_label.shape)
+    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
+    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
 
     dataset = S3DISDataLoader(train_data,train_label)
     dataloader = DataLoader(dataset, batch_size=args.batchsize,shuffle=True, num_workers=int(args.workers))
@@ -105,12 +103,8 @@ def main(args):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
 
-        print(green('semseg'),
-            yellow('model:'), blue(args.model_name),
-            yellow('gpu:'), blue(args.gpu),
-            yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch)),
-            yellow('lr:'), blue(lr)
-        )
+        print_info('semseg -> ',end='')
+        print_kv('model:', args.model_name,'gpu:',args.gpu,'epoch:', '%d/%s' % (epoch, args.epoch),'lr:', lr)
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -141,7 +135,6 @@ def main(args):
         
         print_debug('clear cuda cache')
         torch.cuda.empty_cache()
-        time.sleep(0.05)
 
         test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
             model.eval(), 
@@ -171,4 +164,4 @@ def main(args):
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    main(args)
+    train(args)

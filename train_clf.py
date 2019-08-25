@@ -24,13 +24,13 @@ def parse_args():
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--train_metric', type=str, default=False, help='whether evaluate on training dataset')
     parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer for training')
-    parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
+    parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='decay rate of learning rate')
     parser.add_argument('--rotation',  default=None, help='range of training rotation')
     parser.add_argument('--feature_transform', default=False, help="use feature transform in pointnet")
     return parser.parse_args()
 
-def main(args):
+def train(args):
     dataset_root = select_avaliable([
         '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
         '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
@@ -41,9 +41,8 @@ def main(args):
 
     print_info('Loading dataset ...')
     train_data, train_label, test_data, test_label = load_data(dataset_root, classification=True)
-
-    print_kv("Training data:",train_data.shape)
-    print_kv("Test data:", test_data.shape)
+    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
+    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
     
     if args.rotation is not None:
         ROTATION = (int(args.rotation[0:2]),int(args.rotation[3:5]))
@@ -105,12 +104,8 @@ def main(args):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
 
-        print(green('clf'),
-            yellow('model:'), blue(args.model_name),
-            yellow('gpu:'), blue(args.gpu),
-            yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch)),
-            yellow('lr:'), blue(lr)
-        )
+        print_info('clf -> ',end='')
+        print_kv('model:', args.model_name,'gpu:',args.gpu,'epoch:', '%d/%s' % (epoch, args.epoch),'lr:', lr)
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -132,7 +127,6 @@ def main(args):
         
         print_debug('clear cuda cache')
         torch.cuda.empty_cache()
-        time.sleep(0.05)
 
         train_acc = test(model.eval(), trainDataLoader) if args.train_metric else None
         acc = test(model, testDataLoader)
@@ -155,4 +149,4 @@ def main(args):
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    main(args)
+    train(args)

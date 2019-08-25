@@ -39,7 +39,7 @@ def parse_args():
 
     return parser.parse_args()
 
-def main(args):
+def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/partseg/%s/'%(args.model_name))
 
@@ -109,12 +109,8 @@ def main(args):
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        print(green('partseg'),
-            yellow('model:'), blue(args.model_name),
-            yellow('gpu:'), blue(args.gpu),
-            yellow('epoch:'), blue('%d/%s' % (epoch, args.epoch)),
-            yellow('lr:'), blue(lr)
-        )
+        print_info('partseg -> ',end='')
+        print_kv('model:', args.model_name,'gpu:',args.gpu,'epoch:', '%d/%s' % (epoch, args.epoch),'lr:', lr)
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -174,5 +170,5 @@ def main(args):
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    main(args)
+    train(args)
 
