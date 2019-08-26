@@ -30,7 +30,7 @@ def load_data(root):
                 fn_full = os.path.join(pt_folder, fn)
                 pts = np.loadtxt(fn_full).astype(np.float32)
 
-                h5_index = '%s/%s'%(wordnet_id,token)
+                h5_index = '%s_%s'%(wordnet_id,token)
                 if h5_index in pt_group.keys():
                     print_err('Token exists',h5_index)
                 else:
@@ -38,7 +38,7 @@ def load_data(root):
                 
         print_info('Building cache...')
         fp_h5.close()
-        
+
     print_info('Loading from cache...')
     fp_h5 = h5py.File(fn_cache, 'r')
     pt = fp_h5['pt']
@@ -128,12 +128,20 @@ class PartNormalDataset(Dataset):
 
 
     def __getitem__(self, index):
-        token = self.datapath[index][1].split('/')[-1].split('.')[0]
-        if token in self.full_cache.keys():
+
+        parts = self.datapath[index][1].split('/')
+        wordnet_id = parts[-2]
+        token = parts[-1].split('.')[0]
+        h5_index = '%s/%s'%(wordnet_id,token)
+
+        print_info(list(self.full_cache['02691156'].keys())[:10])
+
+        print_info(h5_index)
+        if h5_index in self.full_cache.keys():
             category = self.datapath[index][0]
             cls_id = self.classes[category]
             cls_id = np.array([cls_id]).astype(np.int32)
-            data = self.full_cache[token]
+            data = self.full_cache[h5_index]
             point_set = data[:, 0:3]
             normal = data[:, 3:6]
             seg = data[:, -1].astype(np.int32)
