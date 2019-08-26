@@ -80,7 +80,7 @@ class PartNormalDataset(Dataset):
 
         if h5_index in self.cache.keys():
             data = self.cache[h5_index]
-            point_set = data[:, 0:3]
+            pointcloud = data[:, 0:3]
             normal = data[:, 3:6]
             seg = data[:, -1].astype(np.int32)
         else:
@@ -88,7 +88,7 @@ class PartNormalDataset(Dataset):
             data = np.loadtxt(fn_full).astype(np.float32)
 
         if self.normalize:
-            point_set = point_cloud_normalize(point_set)
+            pointcloud = point_cloud_normalize(pointcloud)
 
         if self.data_augmentation:
             angle = np.random.randint(0, 30) * np.pi / 180
@@ -98,10 +98,10 @@ class PartNormalDataset(Dataset):
             
         # resample
         choice = np.random.choice(len(seg), self.npoints, replace=True)
-        point_set = point_set[choice, :]
+        pointcloud = pointcloud[choice, :]
         seg = seg[choice]
         normal = normal[choice, :]
-        return point_set,cls_id, seg, normal
+        return pointcloud,cls_id, seg, normal
 
     def __len__(self):
         return len(self.datapath)
