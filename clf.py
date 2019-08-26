@@ -66,12 +66,6 @@ def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/clf/%s/'%(args.model_name))
     train_data, train_label, test_data, test_label = _load()
-    
-    if args.rotation is not None:
-        rotation = (int(args.rotation[0:2]),int(args.rotation[3:5]))
-        print_kv('The range of training rotation is:',rotation)
-    else:
-        rotation = None
 
     trainDataset = ModelNetDataLoader(train_data, train_label, data_augmentation = args.augment)
     trainDataLoader = DataLoader(trainDataset, batch_size=args.batch_size, shuffle=True)
