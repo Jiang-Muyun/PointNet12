@@ -31,8 +31,8 @@ def parse_args():
     parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer for training')
     parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='decay rate of learning rate')
-    parser.add_argument('--rotation',  default=None, help='range of training rotation')
     parser.add_argument('--feature_transform', default=False, help="use feature transform in pointnet")
+    parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     return parser.parse_args()
 
 
@@ -40,12 +40,12 @@ def _load():
     dataset_tmp = 'experiment/modelnet40_ply_hdf5_2048.h5'
     if not os.path.exists(dataset_tmp):
         print_info('Loading data...')
-        dataset_root = select_avaliable([
+        root = select_avaliable([
             '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
             '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
             '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
         ])
-        train_data, train_label, test_data, test_label = load_data(dataset_root, classification = True)
+        train_data, train_label, test_data, test_label = load_data(root, classification = True)
         fp_h5 = h5py.File(dataset_tmp,"w")
         fp_h5.create_dataset('train_data', data = train_data)
         fp_h5.create_dataset('train_label', data = train_label)
@@ -68,15 +68,15 @@ def train(args):
     train_data, train_label, test_data, test_label = _load()
     
     if args.rotation is not None:
-        ROTATION = (int(args.rotation[0:2]),int(args.rotation[3:5]))
-        print_kv('The range of training rotation is:',ROTATION)
+        rotation = (int(args.rotation[0:2]),int(args.rotation[3:5]))
+        print_kv('The range of training rotation is:',rotation)
     else:
-        ROTATION = None
+        rotation = None
 
-    trainDataset = ModelNetDataLoader(train_data, train_label, rotation=ROTATION)
+    trainDataset = ModelNetDataLoader(train_data, train_label, data_augmentation = args.augment)
     trainDataLoader = DataLoader(trainDataset, batch_size=args.batch_size, shuffle=True)
 
-    testDataset = ModelNetDataLoader(test_data, test_label, rotation=ROTATION)
+    testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
     print_kv('Building Model',args.model_name)
@@ -168,7 +168,7 @@ def train(args):
 
 def evaluate(args):
     train_data, train_label, test_data, test_label = _load()
-    testDataset = ModelNetDataLoader(test_data, test_label, rotation=args.rotation)
+    testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
     print_kv('Building Model',args.model_name)
@@ -192,7 +192,6 @@ def evaluate(args):
 def vis(args):
     train_data, train_label, test_data, test_label = _load()
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
-
     print_info('Press space to exit, press Q for next frame')
     
     for idx in range(test_data.shape[0]):

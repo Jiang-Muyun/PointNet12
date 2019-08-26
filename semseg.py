@@ -38,19 +38,20 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
+    parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     return parser.parse_args()
 
 def _load():
     dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.h5'
     if not os.path.exists(dataset_tmp):
         print_info('Loading data...')
-        dataset_root = select_avaliable([
+        root = select_avaliable([
             '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
             '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
             '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
             '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
         ])
-        train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
+        train_data, train_label, test_data, test_label = recognize_all_data(root, test_area = 5)
         fp_h5 = h5py.File(dataset_tmp,"w")
         fp_h5.create_dataset('train_data', data = train_data)
         fp_h5.create_dataset('train_label', data = train_label)
@@ -72,11 +73,11 @@ def train(args):
     checkpoints_dir = mkdir('./experiment/semseg/%s/'%(args.model_name))
     train_data, train_label, test_data, test_label = _load()
 
-    dataset = S3DISDataLoader(train_data,train_label)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
+    dataset = S3DISDataLoader(train_data, train_label, data_augmentation = args.augment)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=args.workers)
     
-    test_dataset = S3DISDataLoader(test_data,test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
+    test_dataset = S3DISDataLoader(test_data, test_label)
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=args.workers)
 
     num_classes = 13
     if args.model_name == 'pointnet2':
@@ -185,12 +186,8 @@ def train(args):
 
 def evaluate(args):
     train_data, train_label, test_data, test_label = _load()
-
-    dataset = S3DISDataLoader(train_data,train_label)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
-    
     test_dataset = S3DISDataLoader(test_data,test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=args.workers)
 
     print_kv('Building Model', args.model_name)
     num_classes = 13
@@ -223,7 +220,7 @@ def evaluate(args):
 def vis(args):
     train_data, train_label, test_data, test_label = _load()
     test_dataset = S3DISDataLoader(test_data,test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=False, num_workers=int(args.workers))
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=False, num_workers=args.workers)
 
     print_kv('Building Model', args.model_name)
     num_classes = 13

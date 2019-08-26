@@ -40,7 +40,7 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
-    parser.add_argument('--jitter', default=False, action='store_true', help="randomly jitter point cloud")
+    parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     return parser.parse_args()
 
 def _load(root):
@@ -72,7 +72,7 @@ def _load(root):
         cache[token] = fp_h5.get(token).value
     return cache
 
-dataset_root = select_avaliable([
+root = select_avaliable([
     '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
     '/media/james/Ubuntu_Data/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
     '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
@@ -82,13 +82,13 @@ dataset_root = select_avaliable([
 def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/partseg/%s/'%(args.model_name))
-    cache = _load(dataset_root)
+    cache = _load(root)
 
     norm = True if args.model_name == 'pointnet' else False
-    train_ds = PartNormalDataset(dataset_root,cache,npoints=2048, split='trainval',normalize=norm, jitter=args.jitter)
+    train_ds = PartNormalDataset(root,cache,npoints=2048, split='trainval', data_augmentation = args.augment)
     dataloader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
     
-    test_ds = PartNormalDataset(dataset_root,cache,npoints=2048, split='test',normalize=norm,jitter=False)
+    test_ds = PartNormalDataset(root,cache,npoints=2048, split='test')
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
     
     print_kv("The number of training data is:",len(train_ds))
@@ -202,9 +202,9 @@ def train(args):
         print_kv('Best inctance avg mIOU:', '%.5f'%(best_inctance_avg_iou))
 
 def evaluate(args):
-    cache = _load(dataset_root)
+    cache = _load(root)
     norm = True if args.model_name == 'pointnet' else False
-    test_ds = PartNormalDataset(dataset_root, cache, npoints=2048, split='test', normalize=norm, jitter=False)
+    test_ds = PartNormalDataset(root, cache, npoints=2048, split='test')
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
     print_kv("The number of test data is:", len(test_ds))
 
@@ -236,9 +236,9 @@ def evaluate(args):
     print_kv('Inctance avg mIOU:','%.5f' % test_metrics['inctance_avg_iou'])
 
 def vis(args):
-    cache = _load(dataset_root)
+    cache = _load(root)
     norm = True if args.model_name == 'pointnet' else False
-    test_ds = PartNormalDataset(dataset_root, cache, npoints=2048, split='test', normalize=norm, jitter=False)
+    test_ds = PartNormalDataset(root, cache, npoints=2048, split='test')
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
     print_kv("The number of test data is:", len(test_ds))
 

@@ -4,8 +4,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import h5py
 import sys
-sys.path.append('.')
-from colors import *
+from .augmentation import jitter_point_cloud, rotate_point_cloud_by_angle
 
 classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
 class2label = {cls: i for i,cls in enumerate(classes)}
@@ -20,7 +19,7 @@ def load_h5(h5_filename):
     return (data, label)
 
 def loadDataFile(filename):
-    print_debug(filename)
+    print(filename)
     return load_h5(filename)
 
 def recognize_all_data(root, test_area = 5):
@@ -53,14 +52,22 @@ def recognize_all_data(root, test_area = 5):
     test_label = label_batches[test_idxs]
     return train_data,train_label,test_data,test_label
 
-
 class S3DISDataLoader(Dataset):
-    def __init__(self, data, labels):
+    def __init__(self, data, labels, data_augmentation=False):
         self.data = data
         self.labels = labels
-
+        self.data_augmentation = data_augmentation
+        
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
-        return self.data[index], self.labels[index]
+        pointcloud = self.data[index]
+        label = self.labels[index]
+        
+        if self.data_augmentation:
+            angle = np.random.randint(0, 30) * np.pi / 180
+            pointcloud = rotate_point_cloud_by_angle(pointcloud, angle)
+            jitter_point_cloud(pointcloud)
+
+        return pointcloud, label

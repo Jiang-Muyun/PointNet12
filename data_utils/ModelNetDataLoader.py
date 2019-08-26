@@ -2,11 +2,8 @@ import numpy as np
 import warnings
 import h5py
 from torch.utils.data import Dataset
-warnings.filterwarnings('ignore')
-
 import sys
-sys.path.append('.')
-from colors import *
+from .augmentation import jitter_point_cloud, rotate_point_cloud_by_angle
 
 class_names = ['airplane','bathtub','bed','bench','bookshelf','bottle',
                 'bowl','car','chair','cone','cup','curtain','desk','door',
@@ -16,7 +13,7 @@ class_names = ['airplane','bathtub','bed','bench','bookshelf','bottle',
                 'table','tent','toilet','tv_stand','vase','wardrobe','xbox']
 
 def load_h5(h5_filename):
-    print_debug(h5_filename)
+    print(h5_filename)
     f = h5py.File(h5_filename)
     data = f['data'][:]
     label = f['label'][:]
@@ -45,36 +42,21 @@ def load_data(path,classification = False):
         return train_data, train_Seglabel, test_data, test_Seglabel
 
 class ModelNetDataLoader(Dataset):
-    def __init__(self, data, labels, rotation = None):
+    def __init__(self, data, labels, augmentation = False):
         self.data = data
         self.labels = labels
-        self.rotation = rotation
+        self.data_augmentation = data_augmentation
 
     def __len__(self):
         return len(self.data)
 
-    def rotate_point_cloud_by_angle(self, data, rotation_angle):
-        """
-        Rotate the point cloud along up direction with certain angle.
-        :param batch_data: Nx3 array, original batch of point clouds
-        :param rotation_angle: range of rotation
-        :return:  Nx3 array, rotated batch of point clouds
-        """
-        cosval = np.cos(rotation_angle)
-        sinval = np.sin(rotation_angle)
-        rotation_matrix = np.array([[cosval, 0, sinval],
-                                    [0, 1, 0],
-                                    [-sinval, 0, cosval]])
-        rotated_data = np.dot(data, rotation_matrix)
-
-        return rotated_data
-
     def __getitem__(self, index):
-        if self.rotation is not None:
-            pointcloud = self.data[index]
-            angle = np.random.randint(self.rotation[0], self.rotation[1]) * np.pi / 180
-            pointcloud = self.rotate_point_cloud_by_angle(pointcloud, angle)
+        pointcloud = self.data[index]
+        label = self.labels[index]
 
-            return pointcloud, self.labels[index]
-        else:
-            return self.data[index], self.labels[index]
+        if self.data_augmentation:
+            angle = np.random.randint(0, 30) * np.pi / 180
+            pointcloud = rotate_point_cloud_by_angle(pointcloud, angle)
+            jitter_point_cloud(pointcloud)
+
+        return pointcloud, label

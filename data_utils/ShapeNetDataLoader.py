@@ -9,37 +9,16 @@ import h5py
 from torch.utils.data import Dataset
 warnings.filterwarnings('ignore')
 import sys
-sys.path.append('.')
-from colors import *
-
-def pc_normalize(pc):
-    centroid = np.mean(pc, axis=0)
-    pc = pc - centroid
-    m = np.max(np.sqrt(np.sum(pc ** 2, axis=1)))
-    pc = pc / m
-    return pc
-
-def jitter_point_cloud(batch_data, sigma=0.01, clip=0.05):
-    """ Randomly jitter points. jittering is per point.
-        Input:
-          BxNx3 array, original batch of point clouds
-        Return:
-          BxNx3 array, jittered batch of point clouds
-    """
-    N, C = batch_data.shape
-    assert(clip > 0)
-    jittered_data = np.clip(sigma * np.random.randn(N, C), -1*clip, clip)
-    jittered_data += batch_data
-    return jittered_data
+from .augmentation import jitter_point_cloud, rotate_point_cloud_by_angle,point_cloud_normalize
 
 class PartNormalDataset(Dataset):
-    def __init__(self, root, cache = {},npoints=2500, split='train', normalize=True, jitter=False):
+    def __init__(self, root, cache = {}, npoints=2500, split='train', normalize=True, data_augmentation=False):
         self.npoints = npoints
         self.root = root
         self.category = {}
         self.normalize = normalize
-        self.jitter = jitter
         self.cache = cache
+        self.data_augmentation = data_augmentation
 
         self.wordnet_id_to_category = {}
         with open(os.path.join(self.root, 'synsetoffset2category.txt'), 'r') as f:
@@ -82,7 +61,7 @@ class PartNormalDataset(Dataset):
                 self.datapath.append(fn)
 
         self.classes = dict(zip(self.category, range(len(self.category))))
-        print_kv('classes',self.classes.keys())
+        print('classes',self.classes.keys())
 
         self.seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43],
                             'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46],
@@ -105,18 +84,19 @@ class PartNormalDataset(Dataset):
             normal = data[:, 3:6]
             seg = data[:, -1].astype(np.int32)
         else:
-            print_err('Error: cache miss',h5_index)
+            print('Error: cache miss',h5_index)
             data = np.loadtxt(fn_full).astype(np.float32)
 
         if self.normalize:
-            point_set = pc_normalize(point_set)
+            point_set = point_cloud_normalize(point_set)
 
-        if self.jitter:
-            jitter_point_cloud(point_set)
-
-        choice = np.random.choice(len(seg), self.npoints, replace=True)
+        if self.data_augmentation:
+            angle = np.random.randint(0, 30) * np.pi / 180
+            pointcloud = rotate_point_cloud_by_angle(pointcloud, angle)
+            jitter_point_cloud(pointcloud)
 
         # resample
+        choice = np.random.choice(len(seg), self.npoints, replace=True)
         point_set = point_set[choice, :]
         seg = seg[choice]
         normal = normal[choice, :]
