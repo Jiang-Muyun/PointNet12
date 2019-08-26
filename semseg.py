@@ -40,8 +40,7 @@ def parse_args():
     return parser.parse_args()
 
 def _load():
-    # dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.npz'
-    dataset_tmp = '/media/james/HDD/indoor3d_sem_seg_hdf5_data.npz'
+    dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.npz'
     if not os.path.exists(dataset_tmp):
         print_info('Loading data...')
         dataset_root = select_avaliable([

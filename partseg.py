@@ -266,10 +266,9 @@ def vis(args):
 
 
 if __name__ == '__main__':
-    from data_utils.ShapeNetDataLoader import load_data
-    load_data(dataset_root)
-    exit()
-
+    # from data_utils.ShapeNetDataLoader import load_data
+    # load_data('/mnt/ramdisk/shapenetcore_partanno_segmentation_benchmark_v0_normal')
+    # exit()
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.mode == "train":
