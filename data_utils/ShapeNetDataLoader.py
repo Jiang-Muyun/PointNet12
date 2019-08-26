@@ -9,7 +9,7 @@ import h5py
 from torch.utils.data import Dataset
 warnings.filterwarnings('ignore')
 import sys
-from .augmentation import jitter_point_cloud, rotate_point_cloud_by_angle,point_cloud_normalize
+from .augmentation import pc_jitter, pc_rotate,point_cloud_normalize
 
 class PartNormalDataset(Dataset):
     def __init__(self, root, cache = {}, npoints=2500, split='train', normalize=True, data_augmentation=False):
@@ -92,9 +92,8 @@ class PartNormalDataset(Dataset):
 
         if self.data_augmentation:
             angle = np.random.randint(0, 30) * np.pi / 180
-            pointcloud = rotate_point_cloud_by_angle(pointcloud, angle)
-            jitter_point_cloud(pointcloud)
-            pointcloud = pointcloud.astype(np.float32)
+            pointcloud = pc_rotate(pointcloud, angle)
+            pointcloud = pc_jitter(pointcloud).astype(np.float32)
             
         # resample
         choice = np.random.choice(len(seg), self.npoints, replace=True)

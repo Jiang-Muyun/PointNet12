@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import h5py
 import sys
-from .augmentation import jitter_point_cloud, rotate_point_cloud_by_angle
+from .augmentation import pc_jitter, pc_rotate
 
 classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
 class2label = {cls: i for i,cls in enumerate(classes)}
@@ -66,9 +66,8 @@ class S3DISDataLoader(Dataset):
         label = self.labels[index]
         
         if self.data_augmentation:
-            angle = np.random.randint(0, 30) * np.pi / 180
-            pointcloud = rotate_point_cloud_by_angle(pointcloud, angle)
-            jitter_point_cloud(pointcloud)
-            pointcloud = pointcloud.astype(np.float32)
-            
+            # angle = np.random.randint(0, 30) * np.pi / 180
+            # pointcloud = pc_rotate(pointcloud, angle)
+            pointcloud = pc_jitter(pointcloud).astype(np.float32)
+
         return pointcloud, label

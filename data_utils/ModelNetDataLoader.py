@@ -3,7 +3,7 @@ import warnings
 import h5py
 from torch.utils.data import Dataset
 import sys
-from .augmentation import jitter_point_cloud, rotate_point_cloud_by_angle
+from .augmentation import pc_jitter, pc_rotate
 
 class_names = ['airplane','bathtub','bed','bench','bookshelf','bottle',
                 'bowl','car','chair','cone','cup','curtain','desk','door',
@@ -56,8 +56,7 @@ class ModelNetDataLoader(Dataset):
 
         if self.data_augmentation:
             angle = np.random.randint(0, 30) * np.pi / 180
-            pointcloud = rotate_point_cloud_by_angle(pointcloud, angle)
-            jitter_point_cloud(pointcloud)
-            pointcloud = pointcloud.astype(np.float32)
+            pointcloud = pc_rotate(pointcloud, angle)
+            pointcloud = pc_jitter(pointcloud).astype(np.float32)
 
         return pointcloud, label

@@ -1,6 +1,6 @@
 import numpy as np
 
-def jitter_point_cloud(batch_data, sigma=0.01, clip=0.05):
+def pc_jitter(batch_data, sigma=0.01, clip=0.05):
     """ Randomly jitter points. jittering is per point.
         Input:
           BxNx3 array, original batch of point clouds
@@ -13,7 +13,7 @@ def jitter_point_cloud(batch_data, sigma=0.01, clip=0.05):
     jittered_data += batch_data
     return jittered_data
 
-def rotate_point_cloud_by_angle(data, rotation_angle):
+def pc_rotate(data, rotation_angle):
     """
     Rotate the point cloud along up direction with certain angle.
     :param batch_data: Nx3 array, original batch of point clouds
