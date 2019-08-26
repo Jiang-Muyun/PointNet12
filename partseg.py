@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
-    parser.add_argument('--jitter', default=False, help="randomly jitter point cloud")
+    parser.add_argument('--jitter', default=False, action='store_true', help="randomly jitter point cloud")
     return parser.parse_args()
 
 dataset_root = select_avaliable([
