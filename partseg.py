@@ -2,6 +2,7 @@ import open3d
 import argparse
 import os
 import time
+import h5py
 import datetime
 import numpy as np
 from matplotlib import pyplot as plt
