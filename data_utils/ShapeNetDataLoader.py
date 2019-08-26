@@ -5,33 +5,40 @@ import warnings
 import numpy as np
 from tqdm import tqdm
 from torch.utils.data import Dataset
+import pickle as pkl
 warnings.filterwarnings('ignore')
 import sys
 sys.path.append('.')
 from colors import *
 
-def build_cache(root):
-    cache = {}
-    fp_category = os.path.join(root, 'synsetoffset2category.txt')
-    category = {}
-    with open(fp_category, 'r') as f:
-        for line in f:
-            line = line.strip().split()
-            category[line[0]] = line[1]
-    print_err(category)
+def load_data(root):
+    fn_cache = 'experiment/shapenetcore_partanno_segmentation_benchmark_v0_normal.pkl'
+    if not os.path.exists(fn_cache):
+        cache = {}
+        category = {}
+        with open(os.path.join(root, 'synsetoffset2category.txt'), 'r') as f:
+            for line in f:
+                line = line.strip().split()
+                category[line[0]] = line[1]
+        print_err(category)
 
-    print_info('Building cache...')
-    for item in category.keys():
-        dir_point = os.path.join(root, category[item])
-        fns = os.listdir(dir_point)
-        print_kv('item', item)
-        for fn in tqdm(fns):
-            token = fn.split('.')[0]
-            fn_full = os.path.join(dir_point, fn)
-            cache[token] = np.loadtxt(fn_full).astype(np.float32)
-            break
-    
-    print_info('Saving cache...')
+        print_info('Building cache...')
+        for item in category.keys():
+            dir_point = os.path.join(root, category[item])
+            fns = os.listdir(dir_point)
+            print_kv('item', item)
+            for fn in tqdm(fns):
+                token = fn.split('.')[0]
+                fn_full = os.path.join(dir_point, fn)
+                cache[token] = np.loadtxt(fn_full).astype(np.float32).tolist()
+        
+        print_info('Saving cache...')
+        pkl.dump(cache, open(fn_cache,'wb'))
+    else:
+        print_info('Loading from cahce...')
+        cache = pkl.load(open(fn_cache,'rb'))
+        for key in cache.keys():
+            cache[key] = np.array(cache[key])
 
 
 def pc_normalize(pc):
@@ -56,31 +63,29 @@ def jitter_point_cloud(batch_data, sigma=0.01, clip=0.05):
 
 class PartNormalDataset(Dataset):
     def __init__(self, root, npoints=2500, split='train', normalize=True, jitter=False):
-        # self.root = './data/shapenetcore_partanno_segmentation_benchmark_v0_normal'
         self.npoints = npoints
         self.root = root
-        self.catfile = os.path.join(self.root, 'synsetoffset2category.txt')
-        self.cat = {}
+        self.category = {}
         self.normalize = normalize
         self.jitter = jitter
 
-        with open(self.catfile, 'r') as f:
+        with open(os.path.join(self.root, 'synsetoffset2category.txt'), 'r') as f:
             for line in f:
                 line = line.strip().split()
-                self.cat[line[0]] = line[1]
-        # {'Airplane': '02691156', 'Bag': '02773838', 'Cap': '02954340', ...}
+                self.category[line[0]] = line[1]
 
-        with open(os.path.join(self.root, 'train_test_split', 'shuffled_train_file_list.json'), 'r') as f:
+        fn_split = os.path.join(self.root, 'train_test_split')
+        with open(os.path.join(fn_split,'shuffled_train_file_list.json'), 'r') as f:
             train_ids = set([str(d.split('/')[2]) for d in json.load(f)])
-        with open(os.path.join(self.root, 'train_test_split', 'shuffled_val_file_list.json'), 'r') as f:
+        with open(os.path.join(fn_split,'shuffled_val_file_list.json'), 'r') as f:
             val_ids = set([str(d.split('/')[2]) for d in json.load(f)])
-        with open(os.path.join(self.root, 'train_test_split', 'shuffled_test_file_list.json'), 'r') as f:
+        with open(os.path.join(fn_split,'shuffled_test_file_list.json'), 'r') as f:
             test_ids = set([str(d.split('/')[2]) for d in json.load(f)])
             
         self.meta = {}
-        for item in self.cat:
+        for item in self.category:
             self.meta[item] = []
-            dir_point = os.path.join(self.root, self.cat[item])
+            dir_point = os.path.join(self.root, self.category[item])
             fns = sorted(os.listdir(dir_point))
 
             if split == 'trainval':
@@ -94,16 +99,15 @@ class PartNormalDataset(Dataset):
             else:
                 raise ValueError('Unknown split: %s. Exiting..' % (split))
 
-            # print(os.path.basename(fns))
             for fn in fns:
                 self.meta[item].append(os.path.join(dir_point, fn))
 
         self.datapath = []
-        for item in self.cat:
+        for item in self.category:
             for fn in self.meta[item]:
                 self.datapath.append((item, fn))
 
-        self.classes = dict(zip(self.cat, range(len(self.cat))))
+        self.classes = dict(zip(self.category, range(len(self.category))))
         print_kv('classes',self.classes)
 
         self.seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43],
@@ -112,8 +116,6 @@ class PartNormalDataset(Dataset):
                             'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40],
                             'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
         self.cache = {}
-
-
 
 
     def __getitem__(self, index):
@@ -125,7 +127,6 @@ class PartNormalDataset(Dataset):
             cat = self.datapath[index][0]
             classi = self.classes[cat]
             classi = np.array([classi]).astype(np.int32)
-            print_kv('fn',fn)
             data = np.loadtxt(fn[1]).astype(np.float32)
             point_set = data[:, 0:3]
             normal = data[:, 3:6]
@@ -152,34 +153,29 @@ class PartNormalDataset(Dataset):
 
 # class PartNormalDataset(Dataset):
 #     def __init__(self, root, npoints=2500, split='train', normalize=True, jitter=False):
-#         # self.root = './data/shapenetcore_partanno_segmentation_benchmark_v0_normal'
 #         self.npoints = npoints
 #         self.root = root
-#         self.catfile = os.path.join(self.root, 'synsetoffset2category.txt')
-#         self.cat = {}
+#         self.category = {}
 #         self.normalize = normalize
 #         self.jitter = jitter
 
-#         with open(self.catfile, 'r') as f:
+#         with open(os.path.join(self.root, 'synsetoffset2category.txt'), 'r') as f:
 #             for line in f:
-#                 ls = line.strip().split()
-#                 self.cat[ls[0]] = ls[1]
-#         self.cat = {k: v for k, v in self.cat.items()}
-#         # print_kv('self.cat', self.cat)
-#         # {'Airplane': '02691156', 'Bag': '02773838', 'Cap': '02954340', ...}
+#                 line = line.strip().split()
+#                 self.category[line[0]] = line[1]
 
-#         with open(os.path.join(self.root, 'train_test_split', 'shuffled_train_file_list.json'), 'r') as f:
+#         fn_split = os.path.join(self.root, 'train_test_split')
+#         with open(os.path.join(fn_split,'shuffled_train_file_list.json'), 'r') as f:
 #             train_ids = set([str(d.split('/')[2]) for d in json.load(f)])
-#         with open(os.path.join(self.root, 'train_test_split', 'shuffled_val_file_list.json'), 'r') as f:
+#         with open(os.path.join(fn_split,'shuffled_val_file_list.json'), 'r') as f:
 #             val_ids = set([str(d.split('/')[2]) for d in json.load(f)])
-#         with open(os.path.join(self.root, 'train_test_split', 'shuffled_test_file_list.json'), 'r') as f:
+#         with open(os.path.join(fn_split,'shuffled_test_file_list.json'), 'r') as f:
 #             test_ids = set([str(d.split('/')[2]) for d in json.load(f)])
-
+            
 #         self.meta = {}
-#         for item in self.cat:
-#             # print('category', item)
+#         for item in self.category:
 #             self.meta[item] = []
-#             dir_point = os.path.join(self.root, self.cat[item])
+#             dir_point = os.path.join(self.root, self.category[item])
 #             fns = sorted(os.listdir(dir_point))
 
 #             if split == 'trainval':
@@ -193,17 +189,15 @@ class PartNormalDataset(Dataset):
 #             else:
 #                 raise ValueError('Unknown split: %s. Exiting..' % (split))
 
-#             # print(os.path.basename(fns))
-#             # print(fns)
 #             for fn in fns:
 #                 self.meta[item].append(os.path.join(dir_point, fn))
 
 #         self.datapath = []
-#         for item in self.cat:
+#         for item in self.category:
 #             for fn in self.meta[item]:
 #                 self.datapath.append((item, fn))
 
-#         self.classes = dict(zip(self.cat, range(len(self.cat))))
+#         self.classes = dict(zip(self.category, range(len(self.category))))
 #         print_kv('classes',self.classes)
 
 #         self.seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43],
@@ -212,6 +206,7 @@ class PartNormalDataset(Dataset):
 #                             'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40],
 #                             'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
 #         self.cache = {}
+
 
 #     def __getitem__(self, index):
 #         print_err('cached',len(self.cache.keys()), index)
@@ -223,7 +218,6 @@ class PartNormalDataset(Dataset):
 #             classi = self.classes[cat]
 #             classi = np.array([classi]).astype(np.int32)
 #             data = np.loadtxt(fn[1]).astype(np.float32)
-#             print_kv('data',data.shape)
 #             point_set = data[:, 0:3]
 #             normal = data[:, 3:6]
 #             seg = data[:, -1].astype(np.int32)

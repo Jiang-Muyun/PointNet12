@@ -266,8 +266,8 @@ def vis(args):
 
 
 if __name__ == '__main__':
-    from data_utils.ShapeNetDataLoader import build_cache
-    build_cache(dataset_root)
+    from data_utils.ShapeNetDataLoader import load_data
+    load_data(dataset_root)
     exit()
 
     args = parse_args()
