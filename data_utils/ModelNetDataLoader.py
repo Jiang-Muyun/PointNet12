@@ -42,7 +42,7 @@ def load_data(path,classification = False):
         return train_data, train_Seglabel, test_data, test_Seglabel
 
 class ModelNetDataLoader(Dataset):
-    def __init__(self, data, labels, augmentation = False):
+    def __init__(self, data, labels, data_augmentation = False):
         self.data = data
         self.labels = labels
         self.data_augmentation = data_augmentation
