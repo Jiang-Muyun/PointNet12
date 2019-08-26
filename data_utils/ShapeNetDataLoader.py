@@ -47,6 +47,29 @@ def load_data(root):
         cache[token] = pt[token]
     return cache
 
+def test_loading(root):
+    fn_cache = 'experiment/shapenetcore_partanno_segmentation_benchmark_v0_normal.h5'
+    print_info('Loading from cache...')
+    fp_h5 = h5py.File(fn_cache, 'r')
+    pt = fp_h5['pt']
+    cache = {}
+    for token in pt.keys():
+        cache[token] = pt[token]
+
+    for line in open(os.path.join(root, 'synsetoffset2category.txt'), 'r'):
+        name,wordnet_id = line.strip().split()
+        pt_folder = os.path.join(root, wordnet_id)
+
+        for fn in tqdm(os.listdir(pt_folder)):
+            token = fn.split('.')[0]
+            fn_full = os.path.join(pt_folder, fn)
+            pts = np.loadtxt(fn_full).astype(np.float32)
+            h5_index = '%s_%s'%(wordnet_id,token)
+
+            if np.abs(np.mean(cache[h5_index] - pts)) >= 0.001:
+                print_err('mismatched')
+    fp_h5.close()
+
 
 def pc_normalize(pc):
     centroid = np.mean(pc, axis=0)
@@ -76,10 +99,12 @@ class PartNormalDataset(Dataset):
         self.normalize = normalize
         self.jitter = jitter
 
+        self.wordnet_id_to_category = {}
         with open(os.path.join(self.root, 'synsetoffset2category.txt'), 'r') as f:
             for line in f:
                 line = line.strip().split()
                 self.category[line[0]] = line[1]
+                self.wordnet_id_to_category[line[1]] = line[0]
 
         fn_split = os.path.join(self.root, 'train_test_split')
         with open(os.path.join(fn_split,'shuffled_train_file_list.json'), 'r') as f:
@@ -112,7 +137,7 @@ class PartNormalDataset(Dataset):
         self.datapath = []
         for item in self.category:
             for fn in self.meta[item]:
-                self.datapath.append((item, fn))
+                self.datapath.append(fn)
 
         self.classes = dict(zip(self.category, range(len(self.category))))
         print_kv('classes',self.classes.keys())
@@ -122,58 +147,43 @@ class PartNormalDataset(Dataset):
                             'Mug': [36, 37], 'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27],
                             'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40],
                             'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
-        
+
         self.full_cache = load_data(root)
         self.cache = {}
 
-
     def __getitem__(self, index):
-
-        parts = self.datapath[index][1].split('/')
+        fn_full = self.datapath[index]
+        parts = fn_full.split('/')
         wordnet_id = parts[-2]
+        category = self.wordnet_id_to_category[wordnet_id]
+        cls_id = np.array([self.classes[category]]).astype(np.int32)
         token = parts[-1].split('.')[0]
-        h5_index = '%s/%s'%(wordnet_id,token)
+        h5_index = '%s_%s'%(wordnet_id,token)
 
-        print_info(list(self.full_cache['02691156'].keys())[:10])
-
-        print_info(h5_index)
         if h5_index in self.full_cache.keys():
-            category = self.datapath[index][0]
-            cls_id = self.classes[category]
-            cls_id = np.array([cls_id]).astype(np.int32)
             data = self.full_cache[h5_index]
             point_set = data[:, 0:3]
             normal = data[:, 3:6]
             seg = data[:, -1].astype(np.int32)
-            point_set1, normal1, seg1, cls_id1 = point_set, normal, seg, cls_id
+            _data = data
         else:
-            print_err('full cache miss')
+            raise ValueError('---')
 
-        if index in self.cache.keys():
-            print_info('cache hit',token)
-            point_set, normal, seg, cls_id = self.cache[index]
-        else:
-            category = self.datapath[index][0]
-            fn = self.datapath[index][1]
-            cls_id = np.array([self.classes[category]]).astype(np.int32)
-            data = np.loadtxt(fn).astype(np.float32)
-            point_set = data[:, 0:3]
-            normal = data[:, 3:6]
-            seg = data[:, -1].astype(np.int32)
-            self.cache[index] = (point_set, normal, seg, cls_id)
-        
-        if (point_set1-point_set).mean() != 0:
-            print_err('point_set not equal',blue((point_set1-point_set).mean()))
-        if (normal1-normal).mean() != 0:print_err('normal not equal')
-        if (seg1-seg).mean() != 0:print_err('seg not equal')
-        if (cls_id1-cls_id).mean() != 0:print_err('cls_id not equal')
+        data = np.loadtxt(fn_full).astype(np.float32)
+        point_set = data[:, 0:3]
+        normal = data[:, 3:6]
+        seg = data[:, -1].astype(np.int32)
+
+        delta = np.mean(np.abs(_data - data))
+        if delta >= 0.01 or _data.shape != data.shape:
+            print_err('Miss match',delta, yellow(h5_index),_data.shape, data.shape)
 
         if self.normalize:
             point_set = pc_normalize(point_set)
             
         if self.jitter:
             jitter_point_cloud(point_set)
-        
+
         choice = np.random.choice(len(seg), self.npoints, replace=True)
 
         # resample
