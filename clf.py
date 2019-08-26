@@ -130,6 +130,7 @@ def train(args):
             points, target = points.cuda(), target.cuda()
             optimizer.zero_grad()
             model = model.train()
+            print_kv('points', points.dtype)
             pred, trans_feat = model(points)
             # print_kv('points',points.shape,'pred',pred.shape)
             loss = F.nll_loss(pred, target.long())

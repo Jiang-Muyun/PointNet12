@@ -69,5 +69,6 @@ class S3DISDataLoader(Dataset):
             angle = np.random.randint(0, 30) * np.pi / 180
             pointcloud = rotate_point_cloud_by_angle(pointcloud, angle)
             jitter_point_cloud(pointcloud)
-
+            pointcloud = pointcloud.astype(np.float32)
+            
         return pointcloud, label

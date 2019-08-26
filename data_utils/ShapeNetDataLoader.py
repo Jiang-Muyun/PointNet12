@@ -94,7 +94,8 @@ class PartNormalDataset(Dataset):
             angle = np.random.randint(0, 30) * np.pi / 180
             pointcloud = rotate_point_cloud_by_angle(pointcloud, angle)
             jitter_point_cloud(pointcloud)
-
+            pointcloud = pointcloud.astype(np.float32)
+            
         # resample
         choice = np.random.choice(len(seg), self.npoints, replace=True)
         point_set = point_set[choice, :]
