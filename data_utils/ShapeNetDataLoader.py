@@ -30,16 +30,15 @@ def load_data(root):
                 fn_full = os.path.join(pt_folder, fn)
                 pts = np.loadtxt(fn_full).astype(np.float32)
 
-                if token in pt_group.keys():
-                    print_err('Token exists',token)
+                h5_index = '%s/%s'%(wordnet_id,token)
+                if h5_index in pt_group.keys():
+                    print_err('Token exists',h5_index)
                 else:
-                    pt_group[token] = pts
-
+                    pt_group[h5_index] = pts
+                
         print_info('Building cache...')
         fp_h5.close()
-
-    exit()
-
+        
     print_info('Loading from cache...')
     fp_h5 = h5py.File(fn_cache, 'r')
     pt = fp_h5['pt']
