@@ -7,12 +7,10 @@ import gc
 from tqdm import tqdm
 import h5py
 from torch.utils.data import Dataset
-import pickle as pkl
 warnings.filterwarnings('ignore')
 import sys
 sys.path.append('.')
 from colors import *
-
 
 def pc_normalize(pc):
     centroid = np.mean(pc, axis=0)
@@ -41,6 +39,7 @@ class PartNormalDataset(Dataset):
         self.category = {}
         self.normalize = normalize
         self.jitter = jitter
+        self.cache = cache
 
         self.wordnet_id_to_category = {}
         with open(os.path.join(self.root, 'synsetoffset2category.txt'), 'r') as f:
@@ -91,8 +90,6 @@ class PartNormalDataset(Dataset):
                             'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40],
                             'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
 
-        self.full_cache = load_data(root)
-
     def __getitem__(self, index):
         fn_full = self.datapath[index]
         parts = fn_full.split('/')
@@ -102,8 +99,8 @@ class PartNormalDataset(Dataset):
         token = parts[-1].split('.')[0]
         h5_index = '%s_%s'%(wordnet_id,token)
 
-        if h5_index in self.full_cache.keys():
-            data = self.full_cache[h5_index]
+        if h5_index in self.cache.keys():
+            data = self.cache[h5_index]
             point_set = data[:, 0:3]
             normal = data[:, 3:6]
             seg = data[:, -1].astype(np.int32)
