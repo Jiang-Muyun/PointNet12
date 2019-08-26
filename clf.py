@@ -24,7 +24,7 @@ def parse_args():
     parser.add_argument('--model_name', default='pointnet2', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=24, help='batch size in training')
-    parser.add_argument('--epoch',  default=100, type=int, help='number of epoch in training')
+    parser.add_argument('--epoch', default=200, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--train_metric', type=str, default=False, help='whether evaluate on training dataset')

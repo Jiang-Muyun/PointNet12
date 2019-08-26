@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
-    parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
+    parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
