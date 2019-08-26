@@ -144,7 +144,7 @@ class PointNet2SemSeg(nn.Module):
         self.drop1 = nn.Dropout(0.5)
         self.conv2 = nn.Conv1d(128, num_classes, 1)
 
-    def forward(self, xyz,points):
+    def forward(self, xyz, points):
         l1_xyz, l1_points = self.sa1(xyz, points)
         l2_xyz, l2_points = self.sa2(l1_xyz, l1_points)
         l3_xyz, l3_points = self.sa3(l2_xyz, l2_points)

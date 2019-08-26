@@ -3,6 +3,7 @@ import argparse
 import os
 import torch
 import time
+import h5py
 import datetime
 import numpy as np
 from matplotlib import pyplot as plt
@@ -40,7 +41,7 @@ def parse_args():
     return parser.parse_args()
 
 def _load():
-    dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.npz'
+    dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.h5'
     if not os.path.exists(dataset_tmp):
         print_info('Loading data...')
         dataset_root = select_avaliable([
@@ -50,15 +51,18 @@ def _load():
             '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
         ])
         train_data, train_label, test_data, test_label = recognize_all_data(dataset_root, test_area = 5)
-        np.savez_compressed(dataset_tmp,train_data=train_data,train_label=train_label,
-                                test_data=test_data,test_label=test_label)
+        fp_h5 = h5py.File(dataset_tmp,"w")
+        fp_h5.create_dataset('train_data', data = train_data)
+        fp_h5.create_dataset('train_label', data = train_label)
+        fp_h5.create_dataset('test_data', data = test_data)
+        fp_h5.create_dataset('test_label', data = test_label)
     else:
-        print_info('Loading from npz...')
-        tmp = np.load(dataset_tmp)
-        train_data = tmp['train_data']
-        train_label = tmp['train_label']
-        test_data = tmp['test_data']
-        test_label = tmp['test_label']
+        print_info('Loading from h5...')
+        fp_h5 = h5py.File(dataset_tmp, 'r')
+        train_data = fp_h5.get('train_data').value
+        train_label = fp_h5.get('train_label').value
+        test_data = fp_h5.get('test_data').value
+        test_label = fp_h5.get('test_label').value
     print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
     return train_data, train_label, test_data, test_label
@@ -218,13 +222,6 @@ def evaluate(args):
 
 def vis(args):
     train_data, train_label, test_data, test_label = _load()
-    print_kv('0-0',train_data[0,0])
-    print_kv('0-1',train_data[0,1])
-    print_kv('0-2',train_data[0,2])
-    print_kv('1-0',train_data[1,0])
-    print_kv('1-1',train_data[1,1])
-    print_kv('1-2',train_data[1,2])
-
     test_dataset = S3DISDataLoader(test_data,test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=False, num_workers=int(args.workers))
 
@@ -258,20 +255,17 @@ def vis(args):
         else:
             pred, _ = model(points)
 
-        pt_offset = points[:, :3, :].transpose(-1, 1)
         points = points[:, :3, :].transpose(-1, 1)
         pred_choice = pred.data.max(-1)[1]
         print_kv('pt',points.shape, 'pred',pred.shape,'target',target.shape,'cho',pred_choice.shape)
 
         for idx in range(batchsize):
             pt, gt, pred = points[idx], target[idx], pred_choice[idx]
-            offset = pt_offset[idx]
-            print_kv('> pt',pt.size(),'gt',gt.size(),'pred',pred.shape,'offset',offset.shape)
 
             gt_color = cmap[gt.cpu().numpy() - 1, :]
             pred_color = cmap[pred.cpu().numpy() - 1, :]
 
-            pt_cloud.append((pt+offset).cpu().numpy())
+            pt_cloud.append((pt).cpu().numpy())
             label_cloud.append(gt_color)
 
         print_kv('np.array(pt_cloud)',np.array(pt_cloud).shape)

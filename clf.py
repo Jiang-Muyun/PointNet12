@@ -2,6 +2,7 @@ import open3d
 import argparse
 import os
 import time
+import h5py
 import datetime
 import numpy as np
 from matplotlib import pyplot as plt
@@ -36,7 +37,7 @@ def parse_args():
 
 
 def _load():
-    dataset_tmp = 'experiment/modelnet40_ply_hdf5_2048.npz'
+    dataset_tmp = 'experiment/modelnet40_ply_hdf5_2048.h5'
     if not os.path.exists(dataset_tmp):
         print_info('Loading data...')
         dataset_root = select_avaliable([
@@ -45,15 +46,18 @@ def _load():
             '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
         ])
         train_data, train_label, test_data, test_label = load_data(dataset_root, classification = True)
-        np.savez(dataset_tmp,train_data=train_data,train_label=train_label,
-                                test_data=test_data,test_label=test_label)
+        fp_h5 = h5py.File(dataset_tmp,"w")
+        fp_h5.create_dataset('train_data', data = train_data)
+        fp_h5.create_dataset('train_label', data = train_label)
+        fp_h5.create_dataset('test_data', data = test_data)
+        fp_h5.create_dataset('test_label', data = test_label)
     else:
-        print_info('Loading from npz...')
-        tmp = np.load(dataset_tmp)
-        train_data = tmp['train_data']
-        train_label = tmp['train_label']
-        test_data = tmp['test_data']
-        test_label = tmp['test_label']
+        print_info('Loading from h5...')
+        fp_h5 = h5py.File(dataset_tmp, 'r')
+        train_data = fp_h5.get('train_data').value
+        train_label = fp_h5.get('train_label').value
+        test_data = fp_h5.get('test_data').value
+        test_label = fp_h5.get('test_label').value
     print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
     return train_data, train_label, test_data, test_label
