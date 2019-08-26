@@ -13,34 +13,6 @@ import sys
 sys.path.append('.')
 from colors import *
 
-def load_data(root):
-    fn_cache = 'experiment/shapenetcore_partanno_segmentation_benchmark_v0_normal.h5'
-    if not os.path.exists(fn_cache):
-        print_info('Indexing Files...')
-        fns_full = []
-        fp_h5 = h5py.File(fn_cache,"w")
-
-        for line in open(os.path.join(root, 'synsetoffset2category.txt'), 'r'):
-            name,wordnet_id = line.strip().split()
-            pt_folder = os.path.join(root, wordnet_id)
-            print_info('Building',name, wordnet_id)
-            for fn in tqdm(os.listdir(pt_folder)):
-                token = fn.split('.')[0]
-                fn_full = os.path.join(pt_folder, fn)
-                data = np.loadtxt(fn_full).astype(np.float32)
-
-                h5_index = '%s_%s'%(wordnet_id,token)
-                fp_h5.create_dataset(h5_index, data = data)
-
-        print_info('Building cache...')
-        fp_h5.close()
-
-    print_info('Loading from cache...')
-    fp_h5 = h5py.File(fn_cache, 'r')
-    cache = {}
-    for token in fp_h5.keys():
-        cache[token] = fp_h5.get(token).value
-    return cache
 
 def pc_normalize(pc):
     centroid = np.mean(pc, axis=0)
@@ -63,7 +35,7 @@ def jitter_point_cloud(batch_data, sigma=0.01, clip=0.05):
     return jittered_data
 
 class PartNormalDataset(Dataset):
-    def __init__(self, root, npoints=2500, split='train', normalize=True, jitter=False):
+    def __init__(self, root, cache = {},npoints=2500, split='train', normalize=True, jitter=False):
         self.npoints = npoints
         self.root = root
         self.category = {}
