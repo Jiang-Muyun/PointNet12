@@ -47,30 +47,6 @@ def load_data(root):
         cache[token] = pt[token]
     return cache
 
-def test_loading(root):
-    fn_cache = 'experiment/shapenetcore_partanno_segmentation_benchmark_v0_normal.h5'
-    print_info('Loading from cache...')
-    fp_h5 = h5py.File(fn_cache, 'r')
-    pt = fp_h5['pt']
-    cache = {}
-    for token in pt.keys():
-        cache[token] = pt[token]
-
-    for line in open(os.path.join(root, 'synsetoffset2category.txt'), 'r'):
-        name,wordnet_id = line.strip().split()
-        pt_folder = os.path.join(root, wordnet_id)
-
-        for fn in tqdm(os.listdir(pt_folder)):
-            token = fn.split('.')[0]
-            fn_full = os.path.join(pt_folder, fn)
-            pts = np.loadtxt(fn_full).astype(np.float32)
-            h5_index = '%s_%s'%(wordnet_id,token)
-
-            if np.abs(np.mean(cache[h5_index] - pts)) >= 0.001:
-                print_err('mismatched')
-    fp_h5.close()
-
-
 def pc_normalize(pc):
     centroid = np.mean(pc, axis=0)
     pc = pc - centroid
@@ -165,18 +141,13 @@ class PartNormalDataset(Dataset):
             point_set = data[:, 0:3]
             normal = data[:, 3:6]
             seg = data[:, -1].astype(np.int32)
-            _data = data
         else:
             raise ValueError('---')
 
-        data = np.loadtxt(fn_full).astype(np.float32)
-        point_set = data[:, 0:3]
-        normal = data[:, 3:6]
-        seg = data[:, -1].astype(np.int32)
-
-        delta = np.mean(np.abs(_data - data))
-        if delta >= 0.01 or _data.shape != data.shape:
-            print_err('Miss match',delta, yellow(h5_index),_data.shape, data.shape)
+        # _data = np.loadtxt(fn_full).astype(np.float32)
+        # delta = np.mean(np.abs(_data - data))
+        # if delta >= 0.01 or _data.shape != data.shape:
+        #     print_err('Miss match',delta, yellow(h5_index),_data.shape, data.shape)
 
         if self.normalize:
             point_set = pc_normalize(point_set)
