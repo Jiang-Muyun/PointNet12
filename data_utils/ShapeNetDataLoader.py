@@ -26,23 +26,22 @@ def load_data(root):
 
         print_info('Building cache...')
         
-        f = h5py.File(fn_cache,"w")
-        g1 = f.create_group("pt")
+        fp_h5 = h5py.File(fn_cache,"w")
+        pt_group = fp_h5.create_group("pt")
 
         cache = {}
         for i,fn_full in tqdm(enumerate(fns_full), total=len(fns_full), smoothing=0.9):
             token = fn_full.split('/')[-1].split('.')[0]
             pts = np.loadtxt(fn_full).astype(np.float32)
-            if token in gl.keys():
+            if token in pt_group.keys():
                 print_err('Token exists',token)
             else:
-                g1[token] = pts
-                
-        f.close()
+                pt_group[token] = pts
+        fp_h5.close()
     else:
         print_info('Loading from cahce...')
-        f = h5py.File(fn_cache, 'r')
-        print_info(f['pt'].keys())
+        fp_h5 = h5py.File(fn_cache, 'r')
+        print_info(fp_h5['pt'].keys())
 
     exit()
     return cache
