@@ -30,7 +30,7 @@ for cat in seg_classes.keys():
 
 def parse_args():
     parser = argparse.ArgumentParser('PointNet2')
-    parser.add_argument('--model_name', type=str, default='pointnet2', help='pointnet or pointnet2')
+    parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
@@ -69,7 +69,7 @@ def _load(root):
     fp_h5 = h5py.File(fn_cache, 'r')
     cache = {}
     for token in fp_h5.keys():
-        cache[token] = fp_h5.get(token).value
+        cache[token] = fp_h5.get(token)[()]
     return cache
 
 root = select_avaliable([

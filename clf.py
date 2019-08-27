@@ -21,7 +21,7 @@ from model.pointnet import PointNetCls, feature_transform_reguliarzer
 
 def parse_args():
     parser = argparse.ArgumentParser('PointNet')
-    parser.add_argument('--model_name', default='pointnet2', help='pointnet or pointnet2')
+    parser.add_argument('--model_name', default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=24, help='batch size in training')
     parser.add_argument('--epoch', default=200, type=int, help='number of epoch in training')
@@ -36,7 +36,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def _load():
+def _load(load_train = True):
     dataset_tmp = 'experiment/modelnet40_ply_hdf5_2048.h5'
     if not os.path.exists(dataset_tmp):
         print_info('Loading data...')
@@ -54,13 +54,19 @@ def _load():
     else:
         print_info('Loading from h5...')
         fp_h5 = h5py.File(dataset_tmp, 'r')
-        train_data = fp_h5.get('train_data').value
-        train_label = fp_h5.get('train_label').value
-        test_data = fp_h5.get('test_data').value
-        test_label = fp_h5.get('test_label').value
-    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
-    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
-    return train_data, train_label, test_data, test_label
+        if load_train:
+            train_data = fp_h5.get('train_data')[()]
+            train_label = fp_h5.get('train_label')[()]
+        test_data = fp_h5.get('test_data')[()]
+        test_label = fp_h5.get('test_label')[()]
+    
+    if load_train:
+        print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
+        print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+        return train_data, train_label, test_data, test_label
+    else:
+        print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+        return test_data, test_label
 
 def train(args):
     experiment_dir = mkdir('./experiment/')
@@ -161,7 +167,7 @@ def train(args):
     print_info('End of training...')
 
 def evaluate(args):
-    train_data, train_label, test_data, test_label = _load()
+    test_data, test_label = _load(load_train = False)
     testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
@@ -184,7 +190,7 @@ def evaluate(args):
     print_kv('Test Accuracy','%.5f' % (acc))
 
 def vis(args):
-    train_data, train_label, test_data, test_label = _load()
+    test_data, test_label = _load(load_train = False)
     print_kv('test_data',test_data.shape,'test_label', test_label.shape)
     print_info('Press space to exit, press Q for next frame')
     
@@ -204,6 +210,70 @@ def vis(args):
         vis.run()
         vis.destroy_window()
 
+# FGSM attack code
+def fgsm_attack(image, eps, data_grad):
+    # Collect the element-wise sign of the data gradient
+    sign_data_grad = data_grad.sign()
+    # Create the perturbed image by adjusting each pixel of the input image
+    perturbed_image = image + eps*sign_data_grad
+    # Adding clipping to maintain [0,1] range
+    perturbed_image = torch.clamp(perturbed_image, 0, 1)
+    # Return the perturbed image
+    return perturbed_image
+
+def adv(args):
+    test_data, test_label = _load(load_train = False)
+    testDataset = ModelNetDataLoader(test_data, test_label)
+    testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
+
+    print_kv('Building Model',args.model_name)
+    if args.model_name == 'pointnet':
+        num_class = 40
+        model = PointNetCls(num_class,args.feature_transform).cuda()  
+    else:
+        model = PointNet2ClsMsg().cuda()
+
+    if args.pretrain is None:
+        print_err('No pretrain model')
+        return
+
+    print_info('Loading pretrain model...')
+    checkpoint = torch.load(args.pretrain)
+    model.load_state_dict(checkpoint)
+    model.eval()
+
+    print_info('Attacking, batch_size = ',args.batch_size)
+    for eps in [0, .05, .1, .15, .2, .25, .3]:
+        succ, fail, skip = 0,0,0
+        for points, gt in testDataLoader:
+            gt = gt[:, 0].long()
+            points = points.transpose(2, 1)
+            points, gt = points.cuda(), gt.cuda()
+            points.requires_grad = True
+            pred, _ = model(points)
+            pred_choice = pred.data.max(1)[1]
+
+            loss = F.nll_loss(pred, gt)
+            model.zero_grad()
+            loss.backward()
+            points_grad = points.grad.data
+            eps = 0.2
+            perturbed_data = fgsm_attack(points, eps, points_grad)
+            output, _ = model(perturbed_data)
+            adv_chocie = output.data.max(1)[1]
+            
+            for i in range(points.shape[0]):
+                if gt[i].item() != pred_choice[i].item():
+                    skip += 1
+                elif pred_choice[i].item() != adv_chocie[i].item():
+                    succ += 1
+                else:
+                    fail += 1
+        print_kv('eps','%.5f'%(eps),
+                'succ_rate','%.5f'%(succ/(succ+fail)),
+                'cls_fail_rate','%.5f'%(skip/(succ+ fail+ skip))
+            )
+
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -213,3 +283,5 @@ if __name__ == '__main__':
         evaluate(args)
     if args.mode == "vis":
         vis(args)
+    if args.mode == "adv":
+        adv(args)

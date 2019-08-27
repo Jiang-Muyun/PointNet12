@@ -28,7 +28,7 @@ for i,cat in enumerate(seg_classes.keys()):
 
 def parse_args():
     parser = argparse.ArgumentParser('PointNet')
-    parser.add_argument('--model_name', type=str, default='pointnet2', help='pointnet or pointnet2')
+    parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     return parser.parse_args()
 
-def _load():
+def _load(load_train = True):
     dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.h5'
     if not os.path.exists(dataset_tmp):
         print_info('Loading data...')
@@ -60,13 +60,19 @@ def _load():
     else:
         print_info('Loading from h5...')
         fp_h5 = h5py.File(dataset_tmp, 'r')
-        train_data = fp_h5.get('train_data').value
-        train_label = fp_h5.get('train_label').value
-        test_data = fp_h5.get('test_data').value
-        test_label = fp_h5.get('test_label').value
-    print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
-    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
-    return train_data, train_label, test_data, test_label
+        if load_train:
+            train_data = fp_h5.get('train_data')[()]
+            train_label = fp_h5.get('train_label')[()]
+        test_data = fp_h5.get('test_data')[()]
+        test_label = fp_h5.get('test_label')[()]
+    
+    if load_train:
+        print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
+        print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+        return train_data, train_label, test_data, test_label
+    else:
+        print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+        return test_data, test_label
 
 def train(args):
     experiment_dir = mkdir('./experiment/')
@@ -185,7 +191,7 @@ def train(args):
 
 
 def evaluate(args):
-    train_data, train_label, test_data, test_label = _load()
+    test_data, test_label = _load(load_train = False)
     test_dataset = S3DISDataLoader(test_data,test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=args.workers)
 
@@ -218,7 +224,7 @@ def evaluate(args):
     print_kv('Test meanIOU','%.5f' % (mean_iou))
 
 def vis(args):
-    train_data, train_label, test_data, test_label = _load()
+    test_data, test_label = _load(load_train = False)
     test_dataset = S3DISDataLoader(test_data,test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=False, num_workers=args.workers)
 
