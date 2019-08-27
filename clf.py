@@ -244,7 +244,7 @@ def adv(args):
 
     print_info('Attacking, batch_size = ',args.batch_size)
     for eps in [0, .05, .1, .15, .2, .25, .3]:
-        succ, fail, skip = 0,0,0
+        succ, fail = 0,0,0
         for points, gt in testDataLoader:
             gt = gt[:, 0].long()
             points = points.transpose(2, 1)
@@ -257,22 +257,18 @@ def adv(args):
             model.zero_grad()
             loss.backward()
             points_grad = points.grad.data
-            eps = 0.2
             perturbed_data = fgsm_attack(points, eps, points_grad)
             output, _ = model(perturbed_data)
             adv_chocie = output.data.max(1)[1]
             
             for i in range(points.shape[0]):
-                if gt[i].item() != pred_choice[i].item():
-                    skip += 1
-                elif pred_choice[i].item() != adv_chocie[i].item():
-                    succ += 1
-                else:
-                    fail += 1
-        print_kv('eps','%.5f'%(eps),
-                'succ_rate','%.5f'%(succ/(succ+fail)),
-                'cls_fail_rate','%.5f'%(skip/(succ+ fail+ skip))
-            )
+                if gt[i].item() == pred_choice[i].item():
+                    if pred_choice[i].item() != adv_chocie[i].item():
+                        succ += 1
+                    else:
+                        fail += 1
+        succ_rate = succ/(succ+fail) * 100
+        print_kv('eps','%.5f'%(eps),'succ_rate','%.5f%%'%(succ_rate))
 
 if __name__ == '__main__':
     args = parse_args()
