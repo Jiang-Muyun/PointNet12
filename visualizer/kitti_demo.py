@@ -141,5 +141,5 @@ if __name__ == "__main__":
     # topview_example1()
     topview_example2()
     # projection_example1()
-    # projection_example2()
+    projection_example2()
 
