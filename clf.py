@@ -102,7 +102,6 @@ def train(args):
     if len(device_ids) >= 2:
         torch.backends.cudnn.benchmark = True
         model.cuda(device_ids[0])
-        print_kv('device_ids')
         model = torch.nn.DataParallel(model, device_ids=device_ids)
         print_info('Using multi GPU:',device_ids)
     else:
