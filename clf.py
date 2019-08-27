@@ -244,7 +244,7 @@ def adv(args):
 
     print_info('Attacking, batch_size = ',args.batch_size)
     for eps in [0, .05, .1, .15, .2, .25, .3]:
-        succ, fail = 0,0,0
+        succ, fail = 0,0
         for points, gt in testDataLoader:
             gt = gt[:, 0].long()
             points = points.transpose(2, 1)
