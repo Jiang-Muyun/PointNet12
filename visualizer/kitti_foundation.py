@@ -10,7 +10,7 @@ import sys
 sys.path.append('.')
 import visualizer.parseTrackletXML as pt_XML
 
-class Kitti:
+class KITTI:
     """
     frame : specific frame number or 'all' for whole dataset. default = 'all'
     velo_path : velodyne bin file path. default = None
@@ -232,11 +232,11 @@ class Kitti:
     def __del__(self):
         pass
 
-class Kitti_util(Kitti):
+class KITTI_Util(KITTI):
 
-    def __init__(self, frame='all', velo_path=None, camera_path=None, \
+    def __init__(self, frame='all', velo_path=None, camera_path=None,
                  img_type='gray', v2c_path=None, c2c_path=None, xml_path=None):
-        super(Kitti_util, self).__init__(frame, velo_path, camera_path, img_type, v2c_path, c2c_path, xml_path)
+        super(KITTI_Util, self).__init__(frame, velo_path, camera_path, img_type, v2c_path, c2c_path, xml_path)
         self.__h_min, self.__h_max = -180, 180
         self.__v_min, self.__v_max = -24.9, 2.0
         self.__v_res, self.__h_res = 0.42, 0.35
