@@ -44,7 +44,6 @@ class STN3d(nn.Module):
         x = x.view(-1, 3, 3)
         return x
 
-
 class STNkd(nn.Module):
     def __init__(self, k=64):
         super(STNkd, self).__init__()
@@ -83,7 +82,6 @@ class STNkd(nn.Module):
         x = x + iden
         x = x.view(-1, self.k, self.k)
         return x
-
 
 class PointNetEncoder(nn.Module):
     def __init__(self, global_feat=True, feature_transform=False, semseg = False):
@@ -127,7 +125,6 @@ class PointNetEncoder(nn.Module):
             x = x.view(-1, 1024, 1).repeat(1, 1, n_pts)
             return torch.cat([x, pointfeat], 1), trans, trans_feat
 
-
 class PointNetCls(nn.Module):
     def __init__(self, k=2, feature_transform=False):
         super(PointNetCls, self).__init__()
@@ -147,7 +144,6 @@ class PointNetCls(nn.Module):
         x = F.relu(self.bn2(self.dropout(self.fc2(x))))
         x = self.fc3(x)
         return F.log_softmax(x, dim=1), trans_feat
-
 
 class PointNetDenseCls(nn.Module):
     def __init__(self, cat_num=16,part_num=50):
@@ -189,24 +185,29 @@ class PointNetDenseCls(nn.Module):
         point_cloud = point_cloud.transpose(2, 1)
         point_cloud_transformed = torch.bmm(point_cloud, trans)
         point_cloud_transformed = point_cloud_transformed.transpose(2, 1)
+
         # MLP
         out1 = F.relu(self.bn1(self.conv1(point_cloud_transformed)))
         out2 = F.relu(self.bn2(self.conv2(out1)))
         out3 = F.relu(self.bn3(self.conv3(out2)))
+
         # net_transformed
         trans_feat = self.fstn(out3)
         x = out3.transpose(2, 1)
         net_transformed = torch.bmm(x, trans_feat)
         net_transformed = net_transformed.transpose(2, 1)
+
         # MLP
         out4 = F.relu(self.bn4(self.conv4(net_transformed)))
         out5 = self.bn5(self.conv5(out4))
         out_max = torch.max(out5, 2, keepdim=True)[0]
         out_max = out_max.view(-1, 2048)
+
         # classification network
         net = F.relu(self.bnc1(self.fc1(out_max)))
         net = F.relu(self.bnc2(self.dropout(self.fc2(net))))
         net = self.fc3(net) # [B,16]
+
         # segmentation network
         out_max = torch.cat([out_max,label],1)
         expand = out_max.view(-1, 2048+16, 1).repeat(1, 1, n_pts)
@@ -220,30 +221,6 @@ class PointNetDenseCls(nn.Module):
         net2 = net2.view(batchsize, n_pts, self.part_num) # [B, N 50]
 
         return net, net2, trans_feat
-
-
-def feature_transform_reguliarzer(trans):
-    d = trans.size()[1]
-    I = torch.eye(d)[None, :, :]
-    if trans.is_cuda:
-        I = I.cuda()
-    loss = torch.mean(torch.norm(torch.bmm(trans, trans.transpose(2, 1) - I), dim=(1, 2)))
-    return loss
-
-class PointNetLoss(torch.nn.Module):
-    def __init__(self, weight=1,mat_diff_loss_scale=0.001):
-        super(PointNetLoss, self).__init__()
-        self.mat_diff_loss_scale = mat_diff_loss_scale
-        self.weight = weight
-
-    def forward(self, labels_pred, label, seg_pred,seg, trans_feat):
-        seg_loss = F.nll_loss(seg_pred, seg)
-        mat_diff_loss = feature_transform_reguliarzer(trans_feat)
-        label_loss = F.nll_loss(labels_pred, label)
-
-        loss = self.weight * seg_loss + (1-self.weight) * label_loss + mat_diff_loss * self.mat_diff_loss_scale
-        return loss, seg_loss, label_loss
-
 
 class PointNetSeg(nn.Module):
     def __init__(self,num_class,feature_transform=False, semseg = False):
@@ -272,6 +249,27 @@ class PointNetSeg(nn.Module):
         x = x.view(batchsize, n_pts, self.k)
         return x, trans_feat
 
+def feature_transform_reguliarzer(trans):
+    d = trans.size()[1]
+    I = torch.eye(d)[None, :, :]
+    if trans.is_cuda:
+        I = I.cuda()
+    loss = torch.mean(torch.norm(torch.bmm(trans, trans.transpose(2, 1) - I), dim=(1, 2)))
+    return loss
+
+class PointNetLoss(torch.nn.Module):
+    def __init__(self, weight=1,mat_diff_loss_scale=0.001):
+        super(PointNetLoss, self).__init__()
+        self.mat_diff_loss_scale = mat_diff_loss_scale
+        self.weight = weight
+
+    def forward(self, labels_pred, label, seg_pred,seg, trans_feat):
+        seg_loss = F.nll_loss(seg_pred, seg)
+        mat_diff_loss = feature_transform_reguliarzer(trans_feat)
+        label_loss = F.nll_loss(labels_pred, label)
+
+        loss = self.weight * seg_loss + (1-self.weight) * label_loss + mat_diff_loss * self.mat_diff_loss_scale
+        return loss, seg_loss, label_loss
 
 
 if __name__ == '__main__':

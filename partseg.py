@@ -244,10 +244,10 @@ def vis(args):
     log.info('Building Model', args.model_name)
     num_classes = 16
     num_part = 50
-    if args.model_name == 'pointnet2':
-        model = PointNet2PartSeg_msg_one_hot(num_part) 
-    else:
+    if args.model_name == 'pointnet':
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
+    else:
+        model = PointNet2PartSeg_msg_one_hot(num_part) 
 
     if args.pretrain is None:
         log.err('No pretrain model')
@@ -264,12 +264,13 @@ def vis(args):
         points = points.transpose(2, 1)
         norm_plt = norm_plt.transpose(2, 1)
         points, label, target, norm_plt = points.cuda(), label.squeeze().cuda(), target.cuda(), norm_plt.cuda()
-        if args.model_name == 'pointnet2':
-            seg_pred = model(points, norm_plt, to_categorical(label, 16))
-        else:
+        if args.model_name == 'pointnet':
             labels_pred, seg_pred, _  = model(points,to_categorical(label,16))
+        else:
+            seg_pred = model(points, norm_plt, to_categorical(label, 16))
         pred_choice = seg_pred.max(-1)[1]
-        # log.info('seg_pred',seg_pred.shape, 'pred_choice',pred_choice.shape)
+        log.info(seg_pred=seg_pred.shape, pred_choice=pred_choice.shape)
+        log.info(seg_pred=seg_pred.shape, pred_choice=pred_choice.shape)
 
         cmap_plt = plt.cm.get_cmap("hsv", num_part)
         cmap_list = [cmap_plt(i)[:3] for i in range(num_part)]

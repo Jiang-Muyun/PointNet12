@@ -19,10 +19,10 @@ import log
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 import colorsys
-from clf import _load, parse_args
+from clf import parse_args, root
 
 def vis(args):
-    test_data, test_label = _load(load_train = False)
+    test_data, test_label = load_data(root, train = False)
     testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=1, shuffle=False)
 
@@ -84,7 +84,7 @@ def vis(args):
         vis.destroy_window()
 
 def adv(args):
-    test_data, test_label = _load(load_train = False)
+    test_data, test_label = load_data(root, train = False)
     testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
@@ -130,6 +130,51 @@ def adv(args):
 
         succ_rate = succ/total * 100
         log.info(eps='%.5f'%(eps),accuracy='%.5f%%'%(succ_rate))
+
+def plot():
+    pass
+    # pointnet fgsm
+    # eps: 0.00000 accuracy: 89.70827% 
+    # eps: 0.00526 accuracy: 78.16045% 
+    # eps: 0.01053 accuracy: 70.38088% 
+    # eps: 0.01579 accuracy: 67.26094% 
+    # eps: 0.02105 accuracy: 65.84279% 
+    # eps: 0.02632 accuracy: 65.68071% 
+    # eps: 0.03158 accuracy: 65.43760% 
+    # eps: 0.03684 accuracy: 65.31605% 
+    # eps: 0.04211 accuracy: 65.31605% 
+    # eps: 0.04737 accuracy: 65.23501% 
+    # eps: 0.05263 accuracy: 64.99190% 
+    # eps: 0.05789 accuracy: 64.54619% 
+    # eps: 0.06316 accuracy: 63.57374% 
+    # eps: 0.06842 accuracy: 62.88493% 
+    # eps: 0.07368 accuracy: 61.58833% 
+    # eps: 0.07895 accuracy: 60.53485% 
+    # eps: 0.08421 accuracy: 59.31929% 
+    # eps: 0.08947 accuracy: 56.96921% 
+    # eps: 0.09474 accuracy: 54.25446% 
+    # eps: 0.10000 accuracy: 51.62075%
+
+    # eps: 0.00000 accuracy: 91.57212% 
+    # eps: 0.00526 accuracy: 84.35981% 
+    # eps: 0.01053 accuracy: 79.74068% 
+    # eps: 0.01579 accuracy: 77.14749% 
+    # eps: 0.02105 accuracy: 74.83793% 
+    # eps: 0.02632 accuracy: 72.60940% 
+    # eps: 0.03158 accuracy: 68.59806% 
+    # eps: 0.03684 accuracy: 64.58671% 
+    # eps: 0.04211 accuracy: 62.76337% 
+    # eps: 0.04737 accuracy: 58.95462% 
+    # eps: 0.05263 accuracy: 56.56402% 
+    # eps: 0.05789 accuracy: 52.71475% 
+    # eps: 0.06316 accuracy: 50.00000% 
+    # eps: 0.06842 accuracy: 45.86710% 
+    # eps: 0.07368 accuracy: 42.01783% 
+    # eps: 0.07895 accuracy: 37.56078% 
+    # eps: 0.08421 accuracy: 33.79254% 
+    # eps: 0.08947 accuracy: 29.25446% 
+    # eps: 0.09474 accuracy: 26.37763% 
+    # eps: 0.10000 accuracy: 22.77147% 
 
 if __name__ == '__main__':
     args = parse_args()

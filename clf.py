@@ -35,43 +35,16 @@ def parse_args():
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     return parser.parse_args()
 
-
-def _load(load_train = True):
-    dataset_tmp = 'experiment/modelnet40_ply_hdf5_2048.h5'
-    if not os.path.exists(dataset_tmp):
-        log.debug('Loading data...')
-        root = select_avaliable([
-            '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-            '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-            '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
-        ])
-        train_data, train_label, test_data, test_label = load_data(root, classification = True)
-        fp_h5 = h5py.File(dataset_tmp,"w")
-        fp_h5.create_dataset('train_data', data = train_data)
-        fp_h5.create_dataset('train_label', data = train_label)
-        fp_h5.create_dataset('test_data', data = test_data)
-        fp_h5.create_dataset('test_label', data = test_label)
-    else:
-        log.info('Loading from h5...')
-        fp_h5 = h5py.File(dataset_tmp, 'r')
-        if load_train:
-            train_data = fp_h5.get('train_data')[()]
-            train_label = fp_h5.get('train_label')[()]
-        test_data = fp_h5.get('test_data')[()]
-        test_label = fp_h5.get('test_label')[()]
-    
-    if load_train:
-        log.info(train_data=train_data.shape, train_label=train_label.shape)
-        log.info(test_data=test_data.shape, test_label=test_label.shape)
-        return train_data, train_label, test_data, test_label
-    else:
-        log.info(test_data=test_data.shape,test_label=test_label.shape)
-        return test_data, test_label
+root = select_avaliable([
+    '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
+    '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
+    '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+])
 
 def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/clf/%s/'%(args.model_name))
-    train_data, train_label, test_data, test_label = _load()
+    train_data, train_label, test_data, test_label = load_data(root)
 
     trainDataset = ModelNetDataLoader(train_data, train_label, data_augmentation = args.augment)
     trainDataLoader = DataLoader(trainDataset, batch_size=args.batch_size, shuffle=True)
@@ -166,7 +139,7 @@ def train(args):
     log.info('End of training...')
 
 def evaluate(args):
-    test_data, test_label = _load(load_train = False)
+    test_data, test_label = load_data(root, train = False)
     testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
@@ -189,7 +162,7 @@ def evaluate(args):
     log.debug(Test_Accurac='%.5f' % (acc))
 
 def vis(args):
-    test_data, test_label = _load(load_train = False)
+    test_data, test_label = load_data(root, train = False)
     log.info(test_data=test_data.shape,test_label=test_label.shape)
     log.info('Press space to exit, press Q for next frame')
     

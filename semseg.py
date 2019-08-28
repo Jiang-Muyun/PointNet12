@@ -86,10 +86,10 @@ def train(args):
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=args.workers)
 
     num_classes = 13
-    if args.model_name == 'pointnet2':
-        model = PointNet2SemSeg(num_classes) 
-    else:
+    if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
+    else:
+        model = PointNet2SemSeg(num_classes) 
 
     if args.pretrain is not None:
         log.debug('Use pretrain model...')

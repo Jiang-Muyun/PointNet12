@@ -33,7 +33,6 @@ class PointNet2ClsMsg(nn.Module):
         x = F.log_softmax(x, -1)
         return x,l3_points
 
-
 class PointNet2ClsSsg(nn.Module):
     def __init__(self):
         super(PointNet2ClsSsg, self).__init__()
@@ -59,7 +58,6 @@ class PointNet2ClsSsg(nn.Module):
         x = self.fc3(x)
         x = F.log_softmax(x, -1)
         return x
-
 
 class PointNet2PartSeg(nn.Module): #TODO part segmentation tasks
     def __init__(self, num_classes):
@@ -126,7 +124,6 @@ class PointNet2PartSeg_msg_one_hot(nn.Module):
         x = F.log_softmax(x, dim=1)
         x = x.permute(0, 2, 1)
         return x
-
 
 class PointNet2SemSeg(nn.Module):
     def __init__(self, num_classes):
