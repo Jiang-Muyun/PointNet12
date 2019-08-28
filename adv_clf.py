@@ -108,7 +108,7 @@ def adv(args):
 
     num = 20
     for eps in np.linspace(0,0.1,num=num):
-        succ, fail = 0,0
+        succ, total = 0,0
         for points, gt in testDataLoader:
             gt = gt[:, 0].long()
             points = points.transpose(2, 1)
@@ -126,33 +126,10 @@ def adv(args):
             adv_chocie = output.data.max(1)[1]
             
             for i in range(points.shape[0]):
-                # pcl_np = points[i].transpose(1, 0).cpu().detach().numpy()
-                # adv_np = perturbed_data[i].transpose(1, 0).cpu().detach().numpy()
-                # log.info(pcl_np=pcl_np.shape,adv_np=adv_np.shape)
-
-                # point_cloud = open3d.geometry.PointCloud()
-                # point_cloud.points = open3d.utility.Vector3dVector(pcl_np)
-                # point_cloud.paint_uniform_color([0.5, 0.5, 0.5])
-
-                # adv_cloud = open3d.geometry.PointCloud()
-                # adv_cloud.points = open3d.utility.Vector3dVector(adv_np)
-                # adv_cloud.paint_uniform_color([0, 1, 0])
-
-                # vis = open3d.visualization.Visualizer()
-                # vis.create_window(args.model_name, height=800, width=600, left=200, top=0)
-                # opt = vis.get_render_option().background_color = np.asarray([0, 0, 0])
-
-                # vis.add_geometry(point_cloud + adv_cloud)
-                # vis.run()
-                # vis.destroy_window()
-
-                if gt[i].item() == pred_choice[i].item():
-                    if pred_choice[i].item() != adv_chocie[i].item():
-                        succ += 1
-                    else:
-                        fail += 1
-        
-        succ_rate = succ/(succ+fail) * 100
+                if pred_choice[i].item() != adv_chocie[i].item():
+                    succ += 1
+                total += 1
+        succ_rate = succ/total * 100
         log.info(eps='%.5f'%(eps),succ_rate='%.5f%%'%(succ_rate))
 
 if __name__ == '__main__':
