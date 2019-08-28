@@ -125,11 +125,11 @@ def adv(args):
             adv_chocie = output.data.max(1)[1]
             
             for i in range(points.shape[0]):
-                if gt[i].item() != adv_chocie[i].item():
+                if gt[i].item() == adv_chocie[i].item():
                     succ += 1
                 total += 1
         succ_rate = succ/total * 100
-        log.info(eps='%.5f'%(eps),succ_rate='%.5f%%'%(succ_rate))
+        log.info(eps='%.5f'%(eps),accuracy='%.5f%%'%(succ_rate))
 
 if __name__ == '__main__':
     args = parse_args()
