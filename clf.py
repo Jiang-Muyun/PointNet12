@@ -210,16 +210,6 @@ def vis(args):
         vis.run()
         vis.destroy_window()
 
-# FGSM attack code
-def fgsm_attack(image, eps, data_grad):
-    # Collect the element-wise sign of the data gradient
-    sign_data_grad = data_grad.sign()
-    # Create the perturbed image by adjusting each pixel of the input image
-    perturbed_image = image + eps*sign_data_grad
-    # Adding clipping to maintain [0,1] range
-    perturbed_image = torch.clamp(perturbed_image, 0, 1)
-    # Return the perturbed image
-    return perturbed_image
 
 def adv(args):
     test_data, test_label = _load(load_train = False)
@@ -257,18 +247,34 @@ def adv(args):
             model.zero_grad()
             loss.backward()
             points_grad = points.grad.data
-            perturbed_data = fgsm_attack(points, eps, points_grad)
+            perturbed_data = points + eps * points_grad.sign()
             output, _ = model(perturbed_data)
             adv_chocie = output.data.max(1)[1]
             
             for i in range(points.shape[0]):
+                # point_cloud = open3d.geometry.PointCloud()
+                # point_cloud.points = open3d.utility.Vector3dVector(points[i].transpose(1, 0).cpu().detach().numpy())
+
+                # adv_cloud = open3d.geometry.PointCloud()
+                # adv_cloud.points = open3d.utility.Vector3dVector(perturbed_data[i].transpose(1, 0).cpu().detach().numpy())
+
+                # vis = open3d.visualization.VisualizerWithKeyCallback()
+                # vis.create_window()
+                # vis.get_render_option().background_color = np.asarray([0, 0, 0])
+                # vis.add_geometry(point_cloud+adv_cloud)
+                # vis.register_key_callback(32, lambda vis: exit())
+                # vis.run()
+                # vis.destroy_window()
+
                 if gt[i].item() == pred_choice[i].item():
                     if pred_choice[i].item() != adv_chocie[i].item():
+                        # print_info(class_names[pred_choice[i].item()],class_names[adv_chocie[i].item()])
                         succ += 1
                     else:
+                        # print_err(class_names[pred_choice[i].item()],class_names[adv_chocie[i].item()])
                         fail += 1
         succ_rate = succ/(succ+fail) * 100
-        print_kv('eps','%.5f'%(eps),'succ_rate','%.5f%%'%(succ_rate))
+        print_kv('eps=','%.5f'%(eps),'succ_rate','%.5f%%'%(succ_rate))
 
 if __name__ == '__main__':
     args = parse_args()
