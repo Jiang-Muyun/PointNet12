@@ -109,7 +109,7 @@ def adv(args):
     num = 20
     for eps in np.linspace(0,0.1,num=num):
         succ, total = 0,0
-        for points, gt in testDataLoader:
+        for points, gt in tqdm(testDataLoader,total=len(testDataLoader),smoothing=0.9):
             gt = gt[:, 0].long().cuda()
             points = points.transpose(2, 1).cuda()
             points.requires_grad = True
