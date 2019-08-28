@@ -109,7 +109,7 @@ def adv(args):
     num = 20
     for eps in np.linspace(0,0.1,num=num):
         succ, total = 0,0
-        for points, gt in tqdm(testDataLoader,total=len(testDataLoader),smoothing=0.9):
+        for points, gt in testDataLoader:
             gt = gt[:, 0].long().cuda()
             points = points.transpose(2, 1).cuda()
             points.requires_grad = True
@@ -124,10 +124,10 @@ def adv(args):
             output, _ = model(perturbed_data)
             adv_chocie = output.data.max(1)[1]
             
-            for i in range(points.shape[0]):
-                if gt[i].item() == adv_chocie[i].item():
-                    succ += 1
-                total += 1
+            result = gt == adv_chocie
+            succ += result.sum().cpu().detach().numpy()
+            total += len(result)
+
         succ_rate = succ/total * 100
         log.info(eps='%.5f'%(eps),accuracy='%.5f%%'%(succ_rate))
 
