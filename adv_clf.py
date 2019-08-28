@@ -110,9 +110,8 @@ def adv(args):
     for eps in np.linspace(0,0.1,num=num):
         succ, total = 0,0
         for points, gt in testDataLoader:
-            gt = gt[:, 0].long()
-            points = points.transpose(2, 1)
-            points, gt = points.cuda(), gt.cuda()
+            gt = gt[:, 0].long().cuda()
+            points = points.transpose(2, 1).cuda()
             points.requires_grad = True
             pred, _ = model(points)
             pred_choice = pred.data.max(1)[1]
@@ -126,7 +125,7 @@ def adv(args):
             adv_chocie = output.data.max(1)[1]
             
             for i in range(points.shape[0]):
-                if pred_choice[i].item() != adv_chocie[i].item():
+                if gt[i].item() != adv_chocie[i].item():
                     succ += 1
                 total += 1
         succ_rate = succ/total * 100
