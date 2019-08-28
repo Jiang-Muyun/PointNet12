@@ -17,7 +17,7 @@ def print_base(fn_color,*args, **kwargs):
     print(tmp)
 
 def debug(*args, **kwargs):
-    print_base(blue, *args, **kwargs)
+    print_base(gray, *args, **kwargs)
 
 def info(*args, **kwargs):
     print_base(green, *args, **kwargs)
