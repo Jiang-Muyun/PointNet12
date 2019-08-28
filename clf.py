@@ -15,7 +15,7 @@ from data_utils.ModelNetDataLoader import ModelNetDataLoader, load_data, class_n
 from pathlib import Path
 from tqdm import tqdm
 from utils import test, save_checkpoint, select_avaliable, mkdir
-from colors import *
+import log
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 
@@ -39,7 +39,7 @@ def parse_args():
 def _load(load_train = True):
     dataset_tmp = 'experiment/modelnet40_ply_hdf5_2048.h5'
     if not os.path.exists(dataset_tmp):
-        print_info('Loading data...')
+        log.debug('Loading data...')
         root = select_avaliable([
             '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
             '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
@@ -52,7 +52,7 @@ def _load(load_train = True):
         fp_h5.create_dataset('test_data', data = test_data)
         fp_h5.create_dataset('test_label', data = test_label)
     else:
-        print_info('Loading from h5...')
+        log.info('Loading from h5...')
         fp_h5 = h5py.File(dataset_tmp, 'r')
         if load_train:
             train_data = fp_h5.get('train_data')[()]
@@ -61,11 +61,11 @@ def _load(load_train = True):
         test_label = fp_h5.get('test_label')[()]
     
     if load_train:
-        print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
-        print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+        log.info(train_data=train_data.shape, train_label=train_label.shape)
+        log.info(test_data=test_data.shape, test_label=test_label.shape)
         return train_data, train_label, test_data, test_label
     else:
-        print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+        log.info(test_data=test_data.shape,test_label=test_label.shape)
         return test_data, test_label
 
 def train(args):
@@ -79,7 +79,7 @@ def train(args):
     testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
-    print_kv('Building Model',args.model_name)
+    log.info('Building Model',args.model_name)
     if args.model_name == 'pointnet':
         num_class = 40
         model = PointNetCls(num_class,args.feature_transform).cuda()  
@@ -87,12 +87,12 @@ def train(args):
         model = PointNet2ClsMsg().cuda()
 
     if args.pretrain is not None:
-        print_info('Use pretrain model...')
+        log.info('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
         init_epoch = int(args.pretrain[:-4].split('-')[-1])
-        print_kv('start epoch from', init_epoch)
+        log.info('start epoch from', init_epoch)
     else:
-        print_info('Training from scratch')
+        log.info('Training from scratch')
         init_epoch = 0
 
     if args.optimizer == 'SGD':
@@ -109,22 +109,21 @@ def train(args):
         torch.backends.cudnn.benchmark = True
         model.cuda(device_ids[0])
         model = torch.nn.DataParallel(model, device_ids=device_ids)
-        print_info('Using multi GPU:',device_ids)
+        log.info('Using multi GPU:',device_ids)
     else:
         model.cuda()
-        print_kv('Using single GPU:',device_ids)
+        log.info('Using single GPU:',device_ids)
 
     global_epoch = 0
     global_step = 0
     best_tst_accuracy = 0.0
 
-    print_info('Start training...')
+    log.info('Start training...')
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
 
-        print_info('clf -> ',end='')
-        print_kv('model:', args.model_name,'gpu:',args.gpu,'epoch:', '%d/%s' % (epoch, args.epoch),'lr:', lr)
+        log.debug(job='clf',model=args.model_name,gpu=args.gpu,epoch='%d/%s' % (epoch, args.epoch),lr=lr)
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -137,7 +136,7 @@ def train(args):
             optimizer.zero_grad()
             model = model.train()
             pred, trans_feat = model(points)
-            # print_kv('points',points.shape,'pred',pred.shape)
+            # log.info('points',points.shape,'pred',pred.shape)
             loss = F.nll_loss(pred, target.long())
             if args.feature_transform and args.model_name == 'pointnet':
                 loss += feature_transform_reguliarzer(trans_feat) * 0.001
@@ -145,33 +144,33 @@ def train(args):
             optimizer.step()
             global_step += 1
         
-        print_debug('clear cuda cache')
+        log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
         if args.train_metric:
             train_acc = test(model.eval(), trainDataLoader)
-            print_kv('Train Accuracy', train_acc)
+            log.info('Train Accuracy', train_acc)
 
         acc = test(model, testDataLoader)
-        print_kv('loss', '%.5f' % (loss.data))
-        print_kv('Test Accuracy', '%.5f' % acc)
+        log.info(loss='%.5f' % (loss.data))
+        log.info(Test_Accuracy='%.5f' % acc)
 
         if acc >= best_tst_accuracy:
             best_tst_accuracy = acc
             fn_pth = 'clf-%s-%.5f-%04d.pth'%(args.model_name, acc, epoch)
-            print_kv('Saving model....', fn_pth)
+            log.debug('Saving model....', fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir,fn_pth))
         global_epoch += 1
 
-    print_kv('Best Accuracy', best_tst_accuracy)
-    print_info('End of training...')
+    log.info(Best_Accuracy = best_tst_accuracy)
+    log.info('End of training...')
 
 def evaluate(args):
     test_data, test_label = _load(load_train = False)
     testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
-    print_kv('Building Model',args.model_name)
+    log.debug('Building Model',args.model_name)
     if args.model_name == 'pointnet':
         num_class = 40
         model = PointNetCls(num_class,args.feature_transform).cuda()  
@@ -179,26 +178,26 @@ def evaluate(args):
         model = PointNet2ClsMsg().cuda()
 
     if args.pretrain is None:
-        print_err('No pretrain model')
+        log.err('No pretrain model')
         return
 
-    print_info('Loading pretrain model...')
+    log.debug('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
 
     acc = test(model.eval(), testDataLoader)
-    print_kv('Test Accuracy','%.5f' % (acc))
+    log.debug(Test_Accurac='%.5f' % (acc))
 
 def vis(args):
     test_data, test_label = _load(load_train = False)
-    print_kv('test_data',test_data.shape,'test_label', test_label.shape)
-    print_info('Press space to exit, press Q for next frame')
+    log.info(test_data=test_data.shape,test_label=test_label.shape)
+    log.info('Press space to exit, press Q for next frame')
     
     for idx in range(test_data.shape[0]):
         point_np = test_data[idx]
         gt_index = test_label[idx]
 
-        print_kv('pt',point_np.shape,'type',point_np.dtype)
+        log.info(pt=point_np.shape, type=point_np.dtype)
         point_cloud = open3d.geometry.PointCloud()
         point_cloud.points = open3d.utility.Vector3dVector(point_np)
 
@@ -216,7 +215,7 @@ def adv(args):
     testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 
-    print_kv('Building Model',args.model_name)
+    log.debug('Building Model',args.model_name)
     if args.model_name == 'pointnet':
         num_class = 40
         model = PointNetCls(num_class,args.feature_transform).cuda()  
@@ -224,15 +223,15 @@ def adv(args):
         model = PointNet2ClsMsg().cuda()
 
     if args.pretrain is None:
-        print_err('No pretrain model')
+        log.err('No pretrain model')
         return
 
-    print_info('Loading pretrain model...')
+    log.debug('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.eval()
 
-    print_info('Attacking, batch_size = ',args.batch_size)
+    log.info('Attacking', batch_size = args.batch_size)
     for eps in [0, .05, .1, .15, .2, .25, .3]:
         succ, fail = 0,0
         for points, gt in testDataLoader:
@@ -268,13 +267,13 @@ def adv(args):
 
                 if gt[i].item() == pred_choice[i].item():
                     if pred_choice[i].item() != adv_chocie[i].item():
-                        # print_info(class_names[pred_choice[i].item()],class_names[adv_chocie[i].item()])
+                        # log.info(class_names[pred_choice[i].item()],class_names[adv_chocie[i].item()])
                         succ += 1
                     else:
-                        # print_err(class_names[pred_choice[i].item()],class_names[adv_chocie[i].item()])
+                        # log.err(class_names[pred_choice[i].item()],class_names[adv_chocie[i].item()])
                         fail += 1
         succ_rate = succ/(succ+fail) * 100
-        print_kv('eps=','%.5f'%(eps),'succ_rate','%.5f%%'%(succ_rate))
+        log.info(eps='%.5f'%(eps),succ_rate='%.5f%%'%(succ_rate))
 
 if __name__ == '__main__':
     args = parse_args()

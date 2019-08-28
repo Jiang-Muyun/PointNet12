@@ -9,7 +9,6 @@ from collections import defaultdict
 import datetime
 import pandas as pd
 import torch.nn.functional as F
-from colors import *
 
 def mkdir(fn):
     os.makedirs(fn, exist_ok=True)

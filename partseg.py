@@ -17,7 +17,7 @@ from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
 from pathlib import Path
 from utils import test_partseg, select_avaliable, mkdir
-from colors import *
+import log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSeg_msg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss
@@ -46,14 +46,14 @@ def parse_args():
 def _load(root):
     fn_cache = 'experiment/shapenetcore_partanno_segmentation_benchmark_v0_normal.h5'
     if not os.path.exists(fn_cache):
-        print_info('Indexing Files...')
+        log.debug('Indexing Files...')
         fns_full = []
         fp_h5 = h5py.File(fn_cache,"w")
 
         for line in open(os.path.join(root, 'synsetoffset2category.txt'), 'r'):
             name,wordnet_id = line.strip().split()
             pt_folder = os.path.join(root, wordnet_id)
-            print_info('Building',name, wordnet_id)
+            log.info('Building',name, wordnet_id)
             for fn in tqdm(os.listdir(pt_folder)):
                 token = fn.split('.')[0]
                 fn_full = os.path.join(pt_folder, fn)
@@ -62,10 +62,10 @@ def _load(root):
                 h5_index = '%s_%s'%(wordnet_id,token)
                 fp_h5.create_dataset(h5_index, data = data)
 
-        print_info('Building cache...')
+        log.debug('Building cache...')
         fp_h5.close()
 
-    print_info('Loading from cache...')
+    log.debug('Loading from cache...')
     fp_h5 = h5py.File(fn_cache, 'r')
     cache = {}
     for token in fp_h5.keys():
@@ -91,8 +91,8 @@ def train(args):
     test_ds = PartNormalDataset(root,cache,npoints=2048, split='test')
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
     
-    print_kv("The number of training data is:",len(train_ds))
-    print_kv("The number of test data is:", len(test_ds))
+    log.info("The number of training data is:",len(train_ds))
+    log.info("The number of test data is:", len(test_ds))
 
     num_classes = 16
     num_part = 50
@@ -103,12 +103,12 @@ def train(args):
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
 
     if args.pretrain is not None:
-        print_info('Use pretrain model...')
+        log.debug('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
         init_epoch = int(args.pretrain[:-4].split('-')[-1])
-        print_kv('start epoch from', init_epoch)
+        log.debug('start epoch from', init_epoch)
     else:
-        print_info('Training from scratch')
+        log.debug('Training from scratch')
         init_epoch = 0
 
     if args.optimizer == 'SGD':
@@ -128,10 +128,10 @@ def train(args):
         torch.backends.cudnn.benchmark = True
         model.cuda(device_ids[0])
         model = torch.nn.DataParallel(model, device_ids=device_ids)
-        print_info('Using multi GPU:',device_ids)
+        log.debug('Using multi GPU:',device_ids)
     else:
         model.cuda()
-        print_info('Using single GPU:',device_ids)
+        log.debug('Using single GPU:',device_ids)
 
     criterion = PointNetLoss()
     LEARNING_RATE_CLIP = 1e-5
@@ -144,8 +144,7 @@ def train(args):
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        print_info('partseg -> ',end='')
-        print_kv('model:', args.model_name,'gpu:',args.gpu,'epoch:', '%d/%s' % (epoch, args.epoch),'lr:', lr)
+        log.debug(job='partseg',model=args.model_name,gpu=args.gpu,epoch='%d/%s' % (epoch, args.epoch),lr=lr)
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -174,22 +173,22 @@ def train(args):
             loss.backward()
             optimizer.step()
             
-        print_debug('clear cuda cache')
+        log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
-        print_kv('Test Accuracy', '%.5f' % test_metrics['accuracy'])
-        print_kv('Class avg mIOU:', '%.5f' % test_metrics['class_avg_iou'])
-        print_kv('Inctance avg mIOU:', '%.5f' % test_metrics['inctance_avg_iou'])
+        log.info('Test Accuracy', '%.5f' % test_metrics['accuracy'])
+        log.info('Class avg mIOU:', '%.5f' % test_metrics['class_avg_iou'])
+        log.info('Inctance avg mIOU:', '%.5f' % test_metrics['inctance_avg_iou'])
 
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
             fn_pth = 'partseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
-            print_kv('Save model...',fn_pth)
+            log.info('Save model...',fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            print_info(cat_mean_iou)
+            log.info(cat_mean_iou)
 
         if test_metrics['class_avg_iou'] > best_class_avg_iou:
             best_class_avg_iou = test_metrics['class_avg_iou']
@@ -197,18 +196,18 @@ def train(args):
         if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
 
-        print_kv('Best accuracy:', '%.5f'%(best_acc))
-        print_kv('Best class avg mIOU:', '%.5f'%(best_class_avg_iou))
-        print_kv('Best inctance avg mIOU:', '%.5f'%(best_inctance_avg_iou))
+        log.info('Best accuracy:', '%.5f'%(best_acc))
+        log.info('Best class avg mIOU:', '%.5f'%(best_class_avg_iou))
+        log.info('Best inctance avg mIOU:', '%.5f'%(best_inctance_avg_iou))
 
 def evaluate(args):
     cache = _load(root)
     norm = True if args.model_name == 'pointnet' else False
     test_ds = PartNormalDataset(root, cache, npoints=2048, split='test')
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
-    print_kv("The number of test data is:", len(test_ds))
+    log.info("The number of test data is:", len(test_ds))
 
-    print_kv('Building Model', args.model_name)
+    log.info('Building Model', args.model_name)
     num_classes = 16
     num_part = 50
     if args.model_name == 'pointnet2':
@@ -217,32 +216,32 @@ def evaluate(args):
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
 
     if args.pretrain is None:
-        print_err('No pretrain model')
+        log.err('No pretrain model')
         return
 
-    print_info('Loading pretrain model...')
+    log.info('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda()
 
-    print_info('Testing pretrain model...')
+    log.info('Testing pretrain model...')
     forpointnet2 = args.model_name == 'pointnet2'
     test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat, num_part, forpointnet2)
 
-    print_kv('test_hist_acc',len(test_hist_acc))
-    print_info(cat_mean_iou)
-    print_kv('Test Accuracy','%.5f' % test_metrics['accuracy'])
-    print_kv('Class avg mIOU:','%.5f' % test_metrics['class_avg_iou'])
-    print_kv('Inctance avg mIOU:','%.5f' % test_metrics['inctance_avg_iou'])
+    log.info('test_hist_acc',len(test_hist_acc))
+    log.info(cat_mean_iou)
+    log.info('Test Accuracy','%.5f' % test_metrics['accuracy'])
+    log.info('Class avg mIOU:','%.5f' % test_metrics['class_avg_iou'])
+    log.info('Inctance avg mIOU:','%.5f' % test_metrics['inctance_avg_iou'])
 
 def vis(args):
     cache = _load(root)
     norm = True if args.model_name == 'pointnet' else False
     test_ds = PartNormalDataset(root, cache, npoints=2048, split='test')
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
-    print_kv("The number of test data is:", len(test_ds))
+    log.info("The number of test data is:", len(test_ds))
 
-    print_kv('Building Model', args.model_name)
+    log.info('Building Model', args.model_name)
     num_classes = 16
     num_part = 50
     if args.model_name == 'pointnet2':
@@ -251,14 +250,14 @@ def vis(args):
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
 
     if args.pretrain is None:
-        print_err('No pretrain model')
+        log.err('No pretrain model')
         return
 
-    print_info('Loading pretrain model...')
+    log.info('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda()
-    print_info('Press space to exit, press Q for next frame')
+    log.info('Press space to exit, press Q for next frame')
     for batch_id, (points, label, target, norm_plt) in enumerate(testdataloader):
         batchsize, num_point, _= points.size()
         points, label, target, norm_plt = Variable(points.float()),Variable(label.long()), Variable(target.long()),Variable(norm_plt.float())
@@ -270,17 +269,17 @@ def vis(args):
         else:
             labels_pred, seg_pred, _  = model(points,to_categorical(label,16))
         pred_choice = seg_pred.max(-1)[1]
-        # print_kv('seg_pred',seg_pred.shape, 'pred_choice',pred_choice.shape)
+        # log.info('seg_pred',seg_pred.shape, 'pred_choice',pred_choice.shape)
 
         cmap_plt = plt.cm.get_cmap("hsv", num_part)
         cmap_list = [cmap_plt(i)[:3] for i in range(num_part)]
         np.random.shuffle(cmap_list)
         cmap = np.array(cmap_list)
 
-        #print_kv('points',points.shape,'label',label.shape,'target',target.shape,'norm_plt',norm_plt.shape)  
+        #log.info('points',points.shape,'label',label.shape,'target',target.shape,'norm_plt',norm_plt.shape)  
         for idx in range(batchsize):
             pt, gt, pred = points[idx].transpose(1, 0), target[idx], pred_choice[idx].transpose(-1, 0)
-            # print_kv('pt',pt.size(),'gt',gt.size(),'pred',pred.shape)
+            # log.info('pt',pt.size(),'gt',gt.size(),'pred',pred.shape)
 
             gt_color = cmap[gt.cpu().numpy() - 1, :]
             pred_color = cmap[pred.cpu().numpy() - 1, :]

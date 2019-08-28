@@ -16,7 +16,7 @@ from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class
 import torch.nn.functional as F
 from pathlib import Path
 from utils import test_semseg, select_avaliable, mkdir
-from colors import *
+import log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
@@ -44,7 +44,7 @@ def parse_args():
 def _load(load_train = True):
     dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.h5'
     if not os.path.exists(dataset_tmp):
-        print_info('Loading data...')
+        log.info('Loading data...')
         root = select_avaliable([
             '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
             '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
@@ -58,7 +58,7 @@ def _load(load_train = True):
         fp_h5.create_dataset('test_data', data = test_data)
         fp_h5.create_dataset('test_label', data = test_label)
     else:
-        print_info('Loading from h5...')
+        log.info('Loading from h5...')
         fp_h5 = h5py.File(dataset_tmp, 'r')
         if load_train:
             train_data = fp_h5.get('train_data')[()]
@@ -67,11 +67,11 @@ def _load(load_train = True):
         test_label = fp_h5.get('test_label')[()]
     
     if load_train:
-        print_kv('train_data',train_data.shape,'train_label' ,train_label.shape)
-        print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+        log.info('train_data',train_data.shape,'train_label' ,train_label.shape)
+        log.info('test_data',test_data.shape,'test_label', test_label.shape)
         return train_data, train_label, test_data, test_label
     else:
-        print_kv('test_data',test_data.shape,'test_label', test_label.shape)
+        log.info('test_data',test_data.shape,'test_label', test_label.shape)
         return test_data, test_label
 
 def train(args):
@@ -92,12 +92,12 @@ def train(args):
         model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
 
     if args.pretrain is not None:
-        print_info('Use pretrain model...')
+        log.debug('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
         init_epoch = int(args.pretrain[:-4].split('-')[-1])
-        print_kv('start epoch from', init_epoch)
+        log.debug('start epoch from', init_epoch)
     else:
-        print_info('Training from scratch')
+        log.debug('Training from scratch')
         init_epoch = 0
 
     if args.optimizer == 'SGD':
@@ -118,10 +118,10 @@ def train(args):
         torch.backends.cudnn.benchmark = True
         model.cuda(device_ids[0])
         model = torch.nn.DataParallel(model, device_ids=device_ids)
-        print_kv('Using multi GPU:',device_ids)
+        log.debug('Using multi GPU:',device_ids)
     else:
         model.cuda()
-        print_kv('Using single GPU:',device_ids)
+        log.debug('Using single GPU:',device_ids)
 
     history = defaultdict(lambda: list())
     best_acc = 0
@@ -131,8 +131,7 @@ def train(args):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
 
-        print_info('semseg -> ',end='')
-        print_kv('model:', args.model_name,'gpu:',args.gpu,'epoch:', '%d/%s' % (epoch, args.epoch),'lr:', lr)
+        log.debug(job='semseg',model=args.model_name,gpu=args.gpu,epoch='%d/%s' % (epoch, args.epoch),lr=lr)
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -161,7 +160,7 @@ def train(args):
             loss.backward()
             optimizer.step()
         
-        print_debug('clear cuda cache')
+        log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
         test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
@@ -173,21 +172,21 @@ def train(args):
         )
         mean_iou = np.mean(cat_mean_iou)
 
-        print_kv('Test accuracy','%.5f' % (test_metrics['accuracy']))
-        print_kv('Test meanIOU','%.5f' % (mean_iou))
+        log.info('Test accuracy','%.5f' % (test_metrics['accuracy']))
+        log.info('Test meanIOU','%.5f' % (mean_iou))
 
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
             fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
-            print_kv('Save model...',fn_pth)            
+            log.info('Save model...',fn_pth)            
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            print_info(cat_mean_iou)
+            log.info(cat_mean_iou)
         
         if mean_iou > best_meaniou:
             best_meaniou = mean_iou
 
-        print_kv('Best accuracy:' , '%.5f' % (best_acc))
-        print_kv('Best meanIOU:','%.5f' % (best_meaniou))
+        log.info('Best accuracy:' , '%.5f' % (best_acc))
+        log.info('Best meanIOU:','%.5f' % (best_meaniou))
 
 
 def evaluate(args):
@@ -195,7 +194,7 @@ def evaluate(args):
     test_dataset = S3DISDataLoader(test_data,test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=args.workers)
 
-    print_kv('Building Model', args.model_name)
+    log.info('Building Model', args.model_name)
     num_classes = 13
     if args.model_name == 'pointnet2':
         model = PointNet2SemSeg(num_classes) 
@@ -203,10 +202,10 @@ def evaluate(args):
         model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
 
     if args.pretrain is None:
-        print_err('No pretrain model')
+        log.err('No pretrain model')
         return
 
-    print_info('Loading pretrain model...')
+    log.info('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda()
@@ -220,15 +219,15 @@ def evaluate(args):
     )
     mean_iou = np.mean(cat_mean_iou)
 
-    print_kv('Test accuracy','%.5f' % (test_metrics['accuracy']))
-    print_kv('Test meanIOU','%.5f' % (mean_iou))
+    log.info('Test accuracy','%.5f' % (test_metrics['accuracy']))
+    log.info('Test meanIOU','%.5f' % (mean_iou))
 
 def vis(args):
     test_data, test_label = _load(load_train = False)
     test_dataset = S3DISDataLoader(test_data,test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=False, num_workers=args.workers)
 
-    print_kv('Building Model', args.model_name)
+    log.info('Building Model', args.model_name)
     num_classes = 13
     if args.model_name == 'pointnet2':
         model = PointNet2SemSeg(num_classes) 
@@ -236,10 +235,10 @@ def vis(args):
         model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
 
     if args.pretrain is None:
-        print_err('No pretrain model')
+        log.err('No pretrain model')
         return
 
-    print_info('Loading pretrain model...')
+    log.debug('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda().eval()
@@ -248,7 +247,7 @@ def vis(args):
     pt_cloud,label_cloud = [],[]
 
     for batch_id, (points, target) in enumerate(testdataloader):
-        print_info('Press space to exit','press Q for next frame')
+        log.info('Press space to exit','press Q for next frame')
         batchsize, num_point, _ = points.size()
         points, target = Variable(points.float()), Variable(target.long())
         points = points.transpose(2, 1)
@@ -260,7 +259,7 @@ def vis(args):
 
         points = points[:, :3, :].transpose(-1, 1)
         pred_choice = pred.data.max(-1)[1]
-        print_kv('pt',points.shape, 'pred',pred.shape,'target',target.shape,'cho',pred_choice.shape)
+        log.info('pt',points.shape, 'pred',pred.shape,'target',target.shape,'cho',pred_choice.shape)
 
         for idx in range(batchsize):
             pt, gt, pred = points[idx], target[idx], pred_choice[idx]
@@ -271,11 +270,11 @@ def vis(args):
             pt_cloud.append((pt).cpu().numpy())
             label_cloud.append(gt_color)
 
-        print_kv('np.array(pt_cloud)',np.array(pt_cloud).shape)
-        print_kv('np.array(label_cloud)',np.array(label_cloud).shape)
+        log.info('np.array(pt_cloud)',np.array(pt_cloud).shape)
+        log.info('np.array(label_cloud)',np.array(label_cloud).shape)
         pt_np = np.array(pt_cloud).reshape((-1,3))
         label_np = np.array(label_cloud).reshape((-1,3))
-        print_kv('pt_np',pt_np.shape,'label_np',label_np.shape)
+        log.info('pt_np',pt_np.shape,'label_np',label_np.shape)
 
         point_cloud = open3d.geometry.PointCloud()
         point_cloud.points = open3d.utility.Vector3dVector(pt_np)
