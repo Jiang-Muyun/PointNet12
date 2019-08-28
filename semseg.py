@@ -67,11 +67,11 @@ def _load(load_train = True):
         test_label = fp_h5.get('test_label')[()]
     
     if load_train:
-        log.info('train_data',train_data.shape,'train_label' ,train_label.shape)
-        log.info('test_data',test_data.shape,'test_label', test_label.shape)
+        log.info(train_data=train_data.shape, train_label=train_label.shape)
+        log.info(test_data=test_data.shape, test_label=test_label.shape)
         return train_data, train_label, test_data, test_label
     else:
-        log.info('test_data',test_data.shape,'test_label', test_label.shape)
+        log.info(test_data=test_data.shape, test_label=test_label.shape)
         return test_data, test_label
 
 def train(args):
@@ -194,7 +194,7 @@ def evaluate(args):
     test_dataset = S3DISDataLoader(test_data,test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=True, num_workers=args.workers)
 
-    log.info('Building Model', args.model_name)
+    log.debug('Building Model', args.model_name)
     num_classes = 13
     if args.model_name == 'pointnet2':
         model = PointNet2SemSeg(num_classes) 
@@ -205,7 +205,7 @@ def evaluate(args):
         log.err('No pretrain model')
         return
 
-    log.info('Loading pretrain model...')
+    log.debug('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda()
@@ -219,15 +219,15 @@ def evaluate(args):
     )
     mean_iou = np.mean(cat_mean_iou)
 
-    log.info('Test accuracy','%.5f' % (test_metrics['accuracy']))
-    log.info('Test meanIOU','%.5f' % (mean_iou))
+    log.info(Test_accuracy='%.5f' % (test_metrics['accuracy']))
+    log.info(Test_meanIOU='%.5f' % (mean_iou))
 
 def vis(args):
     test_data, test_label = _load(load_train = False)
     test_dataset = S3DISDataLoader(test_data,test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size,shuffle=False, num_workers=args.workers)
 
-    log.info('Building Model', args.model_name)
+    log.debug('Building Model', args.model_name)
     num_classes = 13
     if args.model_name == 'pointnet2':
         model = PointNet2SemSeg(num_classes) 
@@ -259,7 +259,7 @@ def vis(args):
 
         points = points[:, :3, :].transpose(-1, 1)
         pred_choice = pred.data.max(-1)[1]
-        log.info('pt',points.shape, 'pred',pred.shape,'target',target.shape,'cho',pred_choice.shape)
+        log.info(pt=points.shape, pred=pred.shape,target=target.shape,pred_choice=pred_choice.shape)
 
         for idx in range(batchsize):
             pt, gt, pred = points[idx], target[idx], pred_choice[idx]
@@ -270,11 +270,10 @@ def vis(args):
             pt_cloud.append((pt).cpu().numpy())
             label_cloud.append(gt_color)
 
-        log.info('np.array(pt_cloud)',np.array(pt_cloud).shape)
-        log.info('np.array(label_cloud)',np.array(label_cloud).shape)
+        log.info(pt_cloud=np.array(pt_cloud).shape, label_cloud=np.array(label_cloud).shape)
         pt_np = np.array(pt_cloud).reshape((-1,3))
         label_np = np.array(label_cloud).reshape((-1,3))
-        log.info('pt_np',pt_np.shape,'label_np',label_np.shape)
+        log.info(pt_np=pt_np.shape,label_np=label_np.shape)
 
         point_cloud = open3d.geometry.PointCloud()
         point_cloud.points = open3d.utility.Vector3dVector(pt_np)

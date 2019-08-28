@@ -10,10 +10,14 @@ def white(x):   return '\033[97m' + str(x) + '\033[0m'
 
 def print_base(fn_color,*args, **kwargs):
     tmp = ''
+    end = '\n'
     for msg in args:
         tmp += '%s ' % (fn_color(msg))
     for k in kwargs.keys():
-        tmp += '%s: %s ' % (yellow(k), fn_color(kwargs[k]))
+        if k == 'end':
+            end = kwargs['end']
+        else:
+            tmp += '%s: %s ' % (yellow(k), fn_color(kwargs[k]))
     print(tmp)
 
 def debug(*args, **kwargs):
