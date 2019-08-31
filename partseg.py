@@ -16,7 +16,8 @@ from torch.autograd import Variable
 from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
 from pathlib import Path
-from utils import test_partseg, select_avaliable, mkdir
+from utils import test_partseg, select_avaliable, mkdir, auto_complete
+from utils import Tick,Tock
 import log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSeg_msg_one_hot
@@ -32,16 +33,16 @@ def parse_args():
     parser = argparse.ArgumentParser('PointNet2')
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
-    parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
+    parser.add_argument('--batch_size', type=int, default=0, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
-    parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
+    parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return parser.parse_args()
+    return auto_complete(parser.parse_args(),'partseg')
 
 def _load(root):
     fn_cache = 'experiment/shapenetcore_partanno_segmentation_benchmark_v0_normal.h5'

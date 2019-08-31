@@ -9,9 +9,46 @@ from collections import defaultdict
 import datetime
 import pandas as pd
 import torch.nn.functional as F
-# import sys
-# sys.path.append('.')
+import sys
 import log
+import time
+
+pretrained={
+    'clf':{
+        'pointnet':'experiment/weights/clf-pointnet-0.89730-0076.pth',
+        'pointnet2':'experiment/weights/clf-pointnet2-0.91933-0073.pth'
+    },
+    'partseg':{
+        'pointnet':'experiment/weights/partseg-pointnet-0.93402-0082.pth',
+        'pointnet2':'experiment/weights/partseg-pointnet2-0.94043-0085.pth'
+    },
+    'semseg':{
+        'pointnet':'experiment/weights/semseg-pointnet-0.83657-0055.pth',
+        'pointnet2':'experiment/weights/semseg-pointnet2-0.87168-0096.pth'
+    }
+}
+batch_size = {
+    'pointnet': 16,
+    'pointnet2': 8,
+}
+def auto_complete(args,job):
+    assert job in ['clf' ,'partseg', 'semseg'], job
+    assert args.model_name in ['pointnet','pointnet2'], args.model_name
+    args.gpu_count = len(args.gpu.split(','))
+
+    log.info(job=job, model_name=args.model_name)
+    if args.pretrain is None:
+        args.pretrain = pretrained[job][args.model_name]
+        log.info(pretrain=args.pretrain)
+        if not os.path.exists(args.pretrain):
+            log.warn('but model not found', path=args.pretrain)
+            args.pretrain = None
+    
+    if args.batch_size == 0:
+        args.batch_size = args.gpu_count * batch_size[args.model_name]
+        log.info(batch_size=args.batch_size, gpu_count=args.gpu_count)
+
+    return args
 
 def mkdir(fn):
     os.makedirs(fn, exist_ok=True)
@@ -27,6 +64,49 @@ def select_avaliable(fn_list):
         log.err(log.yellow("Could not find dataset from"), fn_list)
     else:
         return selected
+
+class Tick():
+    def __init__(self, name='', silent=False):
+        self.name = name
+        self.silent = silent
+
+    def __enter__(self):
+        self.t_start = time.time()
+        if not self.silent:
+            print(log.cyan('> %s ... ' % (self.name)), end='')
+            sys.stdout.flush()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.t_end = time.time()
+        self.delta = self.t_end-self.t_start
+        self.fps = 1/self.delta
+
+        if not self.silent:
+            print(log.cyan('[%.0f ms]' % (self.delta * 1000)))
+            sys.stdout.flush()
+
+
+class Tock():
+    def __init__(self, name=None, report_time=True):
+        self.name = '' if name == None else name+': '
+        self.report_time = report_time
+
+    def __enter__(self):
+        self.t_start = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.t_end = time.time()
+        self.delta = self.t_end-self.t_start
+        self.fps = 1/self.delta
+        if self.report_time:
+            print(log.yellow('(%s%.0fms) ' % (self.name, self.delta * 1000)), end='')
+        else:
+            print(log.yellow('.'), end='')
+        sys.stdout.flush()
+
+
 
 def to_categorical(y, num_classes):
     """ 1-hot encodes a tensor """

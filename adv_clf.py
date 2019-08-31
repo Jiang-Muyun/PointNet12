@@ -176,6 +176,26 @@ def plot():
     # eps: 0.09474 accuracy: 26.37763% 
     # eps: 0.10000 accuracy: 22.77147% 
 
+def cuda_testing():
+    f64 = np.random.rand(256,512,512).astype(np.float64)
+    f32 = np.random.rand(256,512,512).astype(np.float32)
+    i64 = np.random.randint(-127,127,size=(256,512,512),dtype=np.int64)
+    i32 = np.random.randint(-127,127,size=(256,512,512),dtype=np.int32)
+    i16 = np.random.randint(-127,127,size=(256,512,512),dtype=np.int16)
+    i8 =  np.random.randint(0,255,size=(256,512,512),dtype=np.uint8)
+
+    for a in [i64,i32,i16,i8,f64,f32]:
+        with Tick(str(a.dtype)):
+            t = torch.from_numpy(a).to('cpu')
+            with Tock('torch cpu') as t1:
+                for i in range(10):b = t * t
+
+            t = torch.from_numpy(a).to('cuda')
+            with Tock('torch cuda') as t2:
+                for i in range(10):b = t * t
+            
+            print('%.2f'%(t1.delta / t2.delta) ,end=' ')
+
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu

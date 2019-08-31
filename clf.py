@@ -14,7 +14,8 @@ import torch.nn.functional as F
 from data_utils.ModelNetDataLoader import ModelNetDataLoader, load_data, class_names
 from pathlib import Path
 from tqdm import tqdm
-from utils import test, save_checkpoint, select_avaliable, mkdir
+from utils import test, save_checkpoint, select_avaliable, mkdir, auto_complete
+from utils import Tick,Tock
 import log
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
@@ -23,7 +24,7 @@ def parse_args():
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
-    parser.add_argument('--batch_size', type=int, default=24, help='batch size in training')
+    parser.add_argument('--batch_size', type=int, default=0, help='batch size in training')
     parser.add_argument('--epoch', default=200, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
@@ -33,7 +34,7 @@ def parse_args():
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='decay rate of learning rate')
     parser.add_argument('--feature_transform', default=False, help="use feature transform in pointnet")
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return parser.parse_args()
+    return auto_complete(parser.parse_args(),'clf')
 
 root = select_avaliable([
     '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',

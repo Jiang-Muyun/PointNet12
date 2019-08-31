@@ -15,7 +15,8 @@ from torch.autograd import Variable
 from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class2label
 import torch.nn.functional as F
 from pathlib import Path
-from utils import test_semseg, select_avaliable, mkdir
+from utils import test_semseg, select_avaliable, mkdir, auto_complete
+from utils import Tick,Tock
 import log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
@@ -30,16 +31,16 @@ def parse_args():
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
-    parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
+    parser.add_argument('--batch_size', type=int, default=0, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
-    parser.add_argument('--pretrain', type=str, default=None,help='whether use pretrain model')
+    parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return parser.parse_args()
+    return auto_complete(parser.parse_args(),'semseg')
 
 def _load(load_train = True):
     dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.h5'
@@ -244,7 +245,6 @@ def vis(args):
     model.cuda().eval()
     cmap = plt.cm.get_cmap("hsv", 13)
     cmap = np.array([cmap(i) for i in range(13)])[:, :3]
-    pt_cloud,label_cloud = [],[]
 
     for batch_id, (points, target) in enumerate(testdataloader):
         log.info('Press space to exit','press Q for next frame')
@@ -259,34 +259,24 @@ def vis(args):
 
         points = points[:, :3, :].transpose(-1, 1)
         pred_choice = pred.data.max(-1)[1]
-        log.info(pt=points.shape, pred=pred.shape,target=target.shape,pred_choice=pred_choice.shape)
 
         for idx in range(batchsize):
             pt, gt, pred = points[idx], target[idx], pred_choice[idx]
-
             gt_color = cmap[gt.cpu().numpy() - 1, :]
             pred_color = cmap[pred.cpu().numpy() - 1, :]
 
-            pt_cloud.append((pt).cpu().numpy())
-            label_cloud.append(gt_color)
+            point_cloud = open3d.geometry.PointCloud()
+            point_cloud.points = open3d.utility.Vector3dVector(pt.cpu().numpy())
+            point_cloud.colors = open3d.Vector3dVector(gt_color)
 
-        log.info(pt_cloud=np.array(pt_cloud).shape, label_cloud=np.array(label_cloud).shape)
-        pt_np = np.array(pt_cloud).reshape((-1,3))
-        label_np = np.array(label_cloud).reshape((-1,3))
-        log.info(pt_np=pt_np.shape,label_np=label_np.shape)
+            vis = open3d.visualization.VisualizerWithKeyCallback()
+            vis.create_window()
+            vis.get_render_option().background_color = np.asarray([0, 0, 0])
+            vis.add_geometry(point_cloud)
 
-        point_cloud = open3d.geometry.PointCloud()
-        point_cloud.points = open3d.utility.Vector3dVector(pt_np)
-        point_cloud.colors = open3d.Vector3dVector(label_np)
-
-        vis = open3d.visualization.VisualizerWithKeyCallback()
-        vis.create_window()
-        vis.get_render_option().background_color = np.asarray([0, 0, 0])
-        vis.add_geometry(point_cloud)
-
-        vis.register_key_callback(32, lambda vis: exit())
-        vis.run()
-        vis.destroy_window()
+            vis.register_key_callback(32, lambda vis: exit())
+            vis.run()
+            vis.destroy_window()
 
 if __name__ == '__main__':
     args = parse_args()
