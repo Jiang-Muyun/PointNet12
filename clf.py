@@ -38,7 +38,8 @@ def parse_args():
 root = select_avaliable([
     '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
     '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-    '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+    '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
+    '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
 ])
 
 def train(args):
@@ -164,15 +165,38 @@ def evaluate(args):
 def vis(args):
     test_data, test_label = load_data(root, train = False)
     log.info(test_data=test_data.shape,test_label=test_label.shape)
+
+    log.debug('Building Model',args.model_name)
+    if args.model_name == 'pointnet':
+        num_class = 40
+        model = PointNetCls(num_class,args.feature_transform).cuda()  
+    else:
+        model = PointNet2ClsMsg().cuda()
+
+    if args.pretrain is None:
+        log.err('No pretrain model')
+        return
+
+    log.debug('Loading pretrain model...')
+    checkpoint = torch.load(args.pretrain)
+    model.load_state_dict(checkpoint)
+    model.eval()
+
     log.info('Press space to exit, press Q for next frame')
     
     for idx in range(test_data.shape[0]):
-        point_np = test_data[idx]
-        gt_index = test_label[idx]
+        point_np = test_data[idx:idx+1]
+        gt = test_label[idx][0]
 
-        log.info(pt=point_np.shape, type=point_np.dtype)
+        points = torch.from_numpy(point_np)
+        points = points.transpose(2, 1).cuda()
+
+        pred, trans_feat = model(points)
+        pred_choice = pred.data.max(1)[1]
+        log.info(gt=class_names[gt], pred_choice=class_names[pred_choice.cpu().numpy().item()])
+
         point_cloud = open3d.geometry.PointCloud()
-        point_cloud.points = open3d.utility.Vector3dVector(point_np)
+        point_cloud.points = open3d.utility.Vector3dVector(point_np[0])
 
         vis = open3d.visualization.VisualizerWithKeyCallback()
         vis.create_window()

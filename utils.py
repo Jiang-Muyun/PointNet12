@@ -9,15 +9,24 @@ from collections import defaultdict
 import datetime
 import pandas as pd
 import torch.nn.functional as F
+# import sys
+# sys.path.append('.')
+import log
 
 def mkdir(fn):
     os.makedirs(fn, exist_ok=True)
     return fn
 
 def select_avaliable(fn_list):
+    selected = None
     for fn in fn_list:
         if os.path.exists(fn):
-            return fn
+            selected = fn
+            break
+    if selected is None:
+        log.err(log.yellow("Could not find dataset from"), fn_list)
+    else:
+        return selected
 
 def to_categorical(y, num_classes):
     """ 1-hot encodes a tensor """
