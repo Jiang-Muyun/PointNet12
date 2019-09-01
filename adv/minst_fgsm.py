@@ -6,8 +6,6 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-
 
 epsilons = [0, .05, .1, .15, .2, .25, .3]
 pretrained_model = "experiment/weights/lenet_mnist_model.pth"
@@ -39,6 +37,7 @@ test_loader = torch.utils.data.DataLoader(
         batch_size=1, shuffle=True)
 
 # Define what device we are using
+print("CUDA Available: ",torch.cuda.is_available())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Initialize the network
@@ -62,14 +61,14 @@ def fgsm_attack(image, epsilon, data_grad):
     # Return the perturbed image
     return perturbed_image
 
-def test(model, device, test_loader, epsilon):
+def test( model, device, test_loader, epsilon ):
 
     # Accuracy counter
     correct = 0
     adv_examples = []
 
     # Loop over all examples in test set
-    for data, target in tqdm(test_loader,total=len(test_loader)):
+    for data, target in test_loader:
 
         # Send the data and label to the device
         data, target = data.to(device), target.to(device)
