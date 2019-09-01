@@ -8,7 +8,7 @@ import glob
 import cv2
 import sys
 sys.path.append('.')
-import visualizer.parseTrackletXML as pt_XML
+import kitti.parseTrackletXML as pt_XML
 
 class KITTI:
     """
@@ -140,8 +140,10 @@ class KITTI:
         velo_bins = glob.glob(self.__velo_path + '/*.bin')
         velo_bins.sort()
         self.__num_frames = len(velo_bins)
+        
+        # kv_dict of velo files
         velo_files = {i: velo_bins[i] for i in range(len(velo_bins))}
-
+        
         if self.__frame_type in velo_files:
             velo_xyz = self.__get_velo_frame(velo_files)
         else:

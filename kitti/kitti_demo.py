@@ -3,12 +3,16 @@ import numpy as np
 import glob
 import cv2
 from kitti_foundation import KITTI,KITTI_Util
+import sys
+sys.path.append('.')
+import log
 
 root = '/media/james/MyPassport/James/dataset/KITTI/raw/2011_09_26/'
-velo_path = os.path.join(root, '2011_09_26_drive_0009_sync/velodyne_points/data')
+velo_path = os.path.join(root, '2011_09_26_drive_0005_sync/velodyne_points/data')
+image_path = os.path.join(root, '2011_09_26_drive_0005_sync/image_02/data')
+
 v2c_filepath = os.path.join(root,'calib_velo_to_cam.txt')
 c2c_filepath = os.path.join(root,'calib_cam_to_cam.txt')
-image_path = os.path.join(root, '2011_09_26_drive_0009_sync/image_02/data')
 
 def print_projection_cv2(points, color, image):
     """ project converted velodyne points into camera image """
@@ -82,11 +86,16 @@ def topview_example2():
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     vid = cv2.VideoWriter('experiment/demo_topview.avi', fourcc, 25.0, size, False)
 
-    for frame in topview:
-        vid.write(frame)
-        cv2.imshow('topview', frame)
-        if 27 == cv2.waitKey(1):
-            break
+    try:
+        while True:
+            with Tick():
+                frame = next(topview)
+            vid.write(frame)
+            cv2.imshow('topview', frame)
+            if 27 == cv2.waitKey(1):
+                break
+    except StopIteration:
+        pass
 
     vid.release()
 
@@ -98,11 +107,13 @@ def projection_example1():
                     v2c_path=v2c_filepath, c2c_path=c2c_filepath)
 
     img, points, color = res.velo_projection_frame(v_fov=v_fov, h_fov=h_fov)
+    log.info(total = res.num_frame, img=img.shape, points=points.shape, color=color.shape)
     result = print_projection_cv2(points, color, img)
 
     cv2.imshow('projection result', result)
     cv2.waitKey(0)
 
+from utils import Tick, Tock
 def projection_example2():
     """ save video about projecting velodyne points into camera image """
 
@@ -113,19 +124,22 @@ def projection_example2():
 
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     vid = cv2.VideoWriter('experiment/demo_projection.avi', fourcc, 25.0, size)
-    test = KITTI_Util(frame='all', camera_path=image_path, velo_path=velo_path,
-                      v2c_path=v2c_filepath, c2c_path=c2c_filepath)
+    test = KITTI_Util(frame='all', camera_path=image_path, velo_path=velo_path,v2c_path=v2c_filepath, c2c_path=c2c_filepath)
 
     res = test.velo_projection(v_fov=v_fov, h_fov=h_fov)
-
-    for frame, point, color in res:
-        image = print_projection_cv2(point, color, frame)
-        vid.write(image)
-        # print(frame.shape,point.shape,color.shape)
-        cv2.imshow('projection', image)
-        if 27 == cv2.waitKey(1):
-            break
-
+    try:
+        while True:
+            with Tick():
+                with Tock():
+                    frame, point, color = next(res)
+                with Tock(str(point.shape)):
+                    image = print_projection_cv2(point, color, frame)
+            vid.write(image)
+            cv2.imshow('projection', image)
+            if 27 == cv2.waitKey(1):
+                break
+    except StopIteration:
+        pass
     vid.release()
 
 def xml_example():
@@ -139,7 +153,8 @@ if __name__ == "__main__":
     # pano_example1()
     # pano_example2()
     # topview_example1()
+
     topview_example2()
     # projection_example1()
-    projection_example2()
+    # projection_example2()
 
