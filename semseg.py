@@ -16,7 +16,7 @@ from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class
 import torch.nn.functional as F
 from pathlib import Path
 from utils import test_semseg, select_avaliable, mkdir, auto_complete
-from utils import Tick,Tock
+from utils import Tick,Tock,ff
 import log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
@@ -132,7 +132,7 @@ def train(args):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
 
-        log.debug(job='semseg',model=args.model_name,gpu=args.gpu,epoch='%d/%s' % (epoch, args.epoch),lr=lr)
+        log.info(job='semseg',model=args.model_name,gpu=args.gpu,epoch='%d/%s' % (epoch, args.epoch),lr=lr)
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -173,21 +173,23 @@ def train(args):
         )
         mean_iou = np.mean(cat_mean_iou)
 
-        log.info('Test accuracy','%.5f' % (test_metrics['accuracy']))
-        log.info('Test meanIOU','%.5f' % (mean_iou))
-
+        save_model = False
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
-            fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
-            log.info('Save model...',fn_pth)            
-            torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            log.info(cat_mean_iou)
         
         if mean_iou > best_meaniou:
             best_meaniou = mean_iou
+        
+        if save_model:
+            fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
+            log.info('Save model...',fn = fn_pth)
+            torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
+            log.info(cat_mean_iou)
+        else:
+            log.info('No need to save model')
 
-        log.info('Best accuracy:' , '%.5f' % (best_acc))
-        log.info('Best meanIOU:','%.5f' % (best_meaniou))
+        log.warn('Curr',accuracy=ff(test_metrics['accuracy']), meanIOU=ff(mean_iou))
+        log.warn('Best',accuracy=ff(best_acc), meanIOU=ff(best_meaniou))
 
 
 def evaluate(args):
@@ -219,9 +221,7 @@ def evaluate(args):
         pointnet2 = args.model_name == 'pointnet2'
     )
     mean_iou = np.mean(cat_mean_iou)
-
-    log.info(Test_accuracy='%.5f' % (test_metrics['accuracy']))
-    log.info(Test_meanIOU='%.5f' % (mean_iou))
+    log.info(Test_accuracy=ff(test_metrics['accuracy']), Test_meanIOU=ff(mean_iou))
 
 def vis(args):
     test_data, test_label = _load(load_train = False)

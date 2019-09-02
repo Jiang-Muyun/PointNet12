@@ -17,7 +17,7 @@ from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
 from pathlib import Path
 from utils import test_partseg, select_avaliable, mkdir, auto_complete
-from utils import Tick,Tock
+from utils import Tick,Tock,ff
 import log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSegMsg_one_hot
@@ -161,7 +161,7 @@ def train(args):
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-        log.debug(job='partseg',model=args.model_name,gpu=args.gpu,epoch='%d/%s' % (epoch, args.epoch),lr=lr)
+        log.info(job='partseg',model=args.model_name,gpu=args.gpu,epoch='%d/%s' % (epoch, args.epoch),lr=lr)
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -196,7 +196,8 @@ def train(args):
 
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
-
+        
+        save_model = False
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
 
@@ -205,20 +206,23 @@ def train(args):
 
         if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
+            save_model = True
+        
+        if save_model:
             fn_pth = 'partseg-%s-%.5f-%04d.pth' % (args.model_name, best_inctance_avg_iou, epoch)
-            log.warn('Save model...',fn = fn_pth)
+            log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
             log.info(cat_mean_iou)
+        else:
+            log.info('No need to save model')
 
-        log.debug('Curr',
-            accuracy='%.5f'%(test_metrics['accuracy']),
-            class_avg_mIOU = '%.5f'%(test_metrics['class_avg_iou']), 
-            inctance_avg_mIOU = '%.5f'%(test_metrics['inctance_avg_iou']))
+        log.warn('Curr', accuracy=ff(test_metrics['accuracy']),
+            class_avg_mIOU = ff(test_metrics['class_avg_iou']), 
+            inctance_avg_mIOU = ff(test_metrics['inctance_avg_iou']))
 
-        log.debug('Best',
-            accuracy='%.5f'%(best_acc),
-            class_avg_mIOU = '%.5f'%(best_class_avg_iou), 
-            inctance_avg_mIOU = '%.5f'%(best_inctance_avg_iou))
+        log.warn('Best', accuracy=ff(best_acc),
+            class_avg_mIOU = ff(best_class_avg_iou), 
+            inctance_avg_mIOU = ff(best_inctance_avg_iou))
 
 def evaluate(args):
     cache = _load(root)

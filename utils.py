@@ -54,6 +54,9 @@ def mkdir(fn):
     os.makedirs(fn, exist_ok=True)
     return fn
 
+def ff(num):
+    return '%.5f'%(num)
+
 def select_avaliable(fn_list):
     selected = None
     for fn in fn_list:
@@ -194,7 +197,7 @@ def compute_overall_iou(pred, target, num_classes):
         shape_ious.append(np.mean(part_ious))
     return shape_ious
 
-def test_partseg(model, loader, catdict, num_classes = 50,forpointnet2=False):
+def test_partseg(model, loader, catdict, num_classes = 50, forpointnet2=False):
     ''' catdict = {0:Airplane, 1:Airplane, ...49:Table} '''
     iou_tabel = np.zeros((len(catdict),3))
     iou_list = []
