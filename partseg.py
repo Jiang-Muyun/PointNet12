@@ -197,26 +197,28 @@ def train(args):
         forpointnet2 = args.model_name == 'pointnet2'
         test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
 
-        log.info('Test Accuracy', '%.5f' % test_metrics['accuracy'])
-        log.info('Class avg mIOU:', '%.5f' % test_metrics['class_avg_iou'])
-        log.info('Inctance avg mIOU:', '%.5f' % test_metrics['inctance_avg_iou'])
-
         if test_metrics['accuracy'] > best_acc:
             best_acc = test_metrics['accuracy']
-            fn_pth = 'partseg-%s-%.5f-%04d.pth' % (args.model_name, best_acc, epoch)
-            log.info('Save model...',fn_pth)
-            torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            log.info(cat_mean_iou)
 
         if test_metrics['class_avg_iou'] > best_class_avg_iou:
             best_class_avg_iou = test_metrics['class_avg_iou']
 
         if test_metrics['inctance_avg_iou'] > best_inctance_avg_iou:
             best_inctance_avg_iou = test_metrics['inctance_avg_iou']
+            fn_pth = 'partseg-%s-%.5f-%04d.pth' % (args.model_name, best_inctance_avg_iou, epoch)
+            log.warn('Save model...',fn = fn_pth)
+            torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
+            log.info(cat_mean_iou)
 
-        log.info('Best accuracy:', '%.5f'%(best_acc))
-        log.info('Best class avg mIOU:', '%.5f'%(best_class_avg_iou))
-        log.info('Best inctance avg mIOU:', '%.5f'%(best_inctance_avg_iou))
+        log.debug('Curr',
+            accuracy='%.5f'%(test_metrics['accuracy']),
+            class_avg_mIOU = '%.5f'%(test_metrics['class_avg_iou']), 
+            inctance_avg_mIOU = '%.5f'%(test_metrics['inctance_avg_iou']))
+
+        log.debug('Best',
+            accuracy='%.5f'%(best_acc),
+            class_avg_mIOU = '%.5f'%(best_class_avg_iou), 
+            inctance_avg_mIOU = '%.5f'%(best_inctance_avg_iou))
 
 def evaluate(args):
     cache = _load(root)
