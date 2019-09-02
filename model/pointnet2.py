@@ -8,11 +8,25 @@ from model.pointnet_util import PointNetSetAbstractionMsg,PointNetSetAbstraction
 class PointNet2ClsMsg(nn.Module):
     def __init__(self):
         super(PointNet2ClsMsg, self).__init__()
-        self.sa1 = PointNetSetAbstractionMsg(512, [0.1, 0.2, 0.4], [16, 32, 128], 0,
-                                             [[32, 32, 64], [64, 64, 128], [64, 96, 128]])
-        self.sa2 = PointNetSetAbstractionMsg(128, [0.2, 0.4, 0.8], [32, 64, 128], 320,
-                                             [[64, 64, 128], [128, 128, 256], [128, 128, 256]])
-        self.sa3 = PointNetSetAbstraction(None, None, None, 640 + 3, [256, 512, 1024], True)
+        self.sa1 = PointNetSetAbstractionMsg(
+            512, [0.1, 0.2, 0.4], [16, 32, 128], 0,
+            [
+                [32, 32, 64], 
+                [64, 64, 128], 
+                [64, 96, 128]
+            ]
+        )
+        self.sa2 = PointNetSetAbstractionMsg(
+            128, [0.2, 0.4, 0.8], [32, 64, 128], 320,
+            [
+                [64, 64, 128], 
+                [128, 128, 256], 
+                [128, 128, 256]
+            ]
+        )
+        self.sa3 = PointNetSetAbstraction(
+            None, None, None, 640 + 3, [256, 512, 1024], True
+        )
         self.fc1 = nn.Linear(1024, 512)
         self.bn1 = nn.BatchNorm1d(512)
         self.drop1 = nn.Dropout(0.4)
@@ -59,9 +73,9 @@ class PointNet2ClsSsg(nn.Module):
         x = F.log_softmax(x, -1)
         return x
 
-class PointNet2PartSeg(nn.Module): #TODO part segmentation tasks
+class PointNet2PartSegSsg(nn.Module): #TODO part segmentation tasks
     def __init__(self, num_classes):
-        super(PointNet2PartSeg, self).__init__()
+        super(PointNet2PartSegSsg, self).__init__()
         self.sa1 = PointNetSetAbstraction(npoint=512, radius=0.2, nsample=64, in_channel=3, mlp=[64, 64, 128], group_all=False)
         self.sa2 = PointNetSetAbstraction(npoint=128, radius=0.4, nsample=64, in_channel=128 + 3, mlp=[128, 128, 256], group_all=False)
         self.sa3 = PointNetSetAbstraction(npoint=None, radius=None, nsample=None, in_channel=256 + 3, mlp=[256, 512, 1024], group_all=True)
@@ -90,9 +104,9 @@ class PointNet2PartSeg(nn.Module): #TODO part segmentation tasks
         x = x.permute(0, 2, 1)
         return x, feat
 
-class PointNet2PartSeg_msg_one_hot(nn.Module):
+class PointNet2PartSegMsg_one_hot(nn.Module):
     def __init__(self, num_classes):
-        super(PointNet2PartSeg_msg_one_hot, self).__init__()
+        super(PointNet2PartSegMsg_one_hot, self).__init__()
         self.sa1 = PointNetSetAbstractionMsg(512, [0.1, 0.2, 0.4], [32, 64, 128], 0+3, [[32, 32, 64], [64, 64, 128], [64, 96, 128]])
         self.sa2 = PointNetSetAbstractionMsg(128, [0.4,0.8], [64, 128], 128+128+64, [[128, 128, 256], [128, 196, 256]])
         self.sa3 = PointNetSetAbstraction(npoint=None, radius=None, nsample=None, in_channel=512 + 3, mlp=[256, 512, 1024], group_all=True)
@@ -132,6 +146,7 @@ class PointNet2SemSeg(nn.Module):
         self.sa2 = PointNetSetAbstraction(256, 0.2, 32, 64 + 3, [64, 64, 128], False)
         self.sa3 = PointNetSetAbstraction(64, 0.4, 32, 128 + 3, [128, 128, 256], False)
         self.sa4 = PointNetSetAbstraction(16, 0.8, 32, 256 + 3, [256, 256, 512], False)
+            
         self.fp4 = PointNetFeaturePropagation(768, [256, 256])
         self.fp3 = PointNetFeaturePropagation(384, [256, 256])
         self.fp2 = PointNetFeaturePropagation(320, [256, 128])
@@ -165,7 +180,7 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     input = torch.randn((8,3,2048))
     label = torch.randn(8,16)
-    model = PointNet2PartSeg_msg_one_hot(num_classes=50)
+    model = PointNet2PartSegMsg_one_hot(num_classes=50)
     output= model(input,input,label)
     print(output.size())
 

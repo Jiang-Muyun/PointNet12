@@ -20,7 +20,7 @@ from utils import test_partseg, select_avaliable, mkdir, auto_complete
 from utils import Tick,Tock
 import log
 from tqdm import tqdm
-from model.pointnet2 import PointNet2PartSeg_msg_one_hot
+from model.pointnet2 import PointNet2PartSegMsg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss
 
 seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43], 'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46], 'Mug': [36, 37], 'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27], 'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40], 'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
@@ -98,10 +98,10 @@ def train(args):
     num_classes = 16
     num_part = 50
 
-    if args.model_name == 'pointnet2':
-        model = PointNet2PartSeg_msg_one_hot(num_part) 
-    else:
+    if args.model_name == 'pointnet':
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
+    else:
+        model = PointNet2PartSegMsg_one_hot(num_part)
 
     if args.pretrain is not None:
         log.debug('Use pretrain model...')
@@ -142,6 +142,23 @@ def train(args):
     best_class_avg_iou = 0
     best_inctance_avg_iou = 0
 
+    def feature_transform_reguliarzer(trans):
+        d = trans.size()[1]
+        I = torch.eye(d)[None, :, :]
+        if trans.is_cuda:
+            I = I.cuda()
+        loss = torch.mean(torch.norm(torch.bmm(trans, trans.transpose(2, 1) - I), dim=(1, 2)))
+        return loss
+
+    def PointNet_Loss(labels_pred, label, seg_pred, seg, trans_feat):
+        mat_diff_loss_scale = 0.001
+        weight = 1
+        seg_loss = F.nll_loss(seg_pred, seg)
+        mat_diff_loss = feature_transform_reguliarzer(trans_feat)
+        label_loss = F.nll_loss(labels_pred, label)
+        loss = weight * seg_loss + (1-weight) * label_loss + mat_diff_loss * mat_diff_loss_scale
+        return loss, seg_loss, label_loss
+
     for epoch in range(init_epoch,args.epoch):
         scheduler.step()
         lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
@@ -163,7 +180,8 @@ def train(args):
                 labels_pred, seg_pred, trans_feat = model(points, to_categorical(label, 16))
                 seg_pred = seg_pred.contiguous().view(-1, num_part)
                 target = target.view(-1, 1)[:, 0]
-                loss, seg_loss, label_loss = criterion(labels_pred, label, seg_pred, target, trans_feat)
+                # loss, seg_loss, label_loss = criterion(labels_pred, label, seg_pred, target, trans_feat)
+                loss, seg_loss, label_loss = PointNet_Loss(labels_pred, label, seg_pred, target, trans_feat)
             else:
                 seg_pred = model(points, norm_plt, to_categorical(label, 16))
                 seg_pred = seg_pred.contiguous().view(-1, num_part)
@@ -212,7 +230,7 @@ def evaluate(args):
     num_classes = 16
     num_part = 50
     if args.model_name == 'pointnet2':
-        model = PointNet2PartSeg_msg_one_hot(num_part) 
+        model = PointNet2PartSegMsg_one_hot(num_part) 
     else:
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
 
@@ -248,7 +266,7 @@ def vis(args):
     if args.model_name == 'pointnet':
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
     else:
-        model = PointNet2PartSeg_msg_one_hot(num_part) 
+        model = PointNet2PartSegMsg_one_hot(num_part) 
 
     if args.pretrain is None:
         log.err('No pretrain model')

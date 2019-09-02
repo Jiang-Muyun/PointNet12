@@ -1,8 +1,6 @@
 import requests
 import json
 import sys
-sys.path.append('.')
-import log
 import os
 from tqdm import tqdm
 import time
@@ -36,32 +34,32 @@ def http_download(local_filename,url):
         return False
 
 def make_kitti_list():
-    url_list = json.load(open('kitti/kitti_raw.json','r'))
+    url_list = json.load(open('kitti_raw.json','r'))
     kitti_list = []
     for i,url in tqdm(enumerate(url_list), total=len(url_list), smoothing=0.9):
         fn = url.split('/')[-1]
         response = requests.head(url)
         length = int(response.headers['content-length'])
-        log.info(fn,length=length)
+        print(fn,"length:",length)
         kitti_list.append((url,length))
 
-    json.dump(kitti_list,open('kitti/kitti_list.json','w'))
+    json.dump(kitti_list,open('kitti_list.json','w'))
 
 def download(dl_folder = '/media/james/MyPassport/James/dataset/KITTI/raw/'):
-    kitti_list = json.load(open('kitti/kitti_list.json','r'))
+    kitti_list = json.load(open('kitti_list.json','r'))
     for i,(url,length) in enumerate(kitti_list):
         fn = url.split('/')[-1]
         local_filename = os.path.join(dl_folder,fn)
         if os.path.exists(local_filename):
             file_size = os.path.getsize(local_filename)
             if file_size == length:
-                log.debug('skip', fn=fn, length = sizeof_fmt(length))
+                print('skip', fn, sizeof_fmt(length))
             else:
-                log.debug('size mismatch',length, file_size)
+                print('size mismatch',length, file_size)
                 os.remove(local_filename)
 
         if not os.path.exists(local_filename):
-            log.info('Downloading', local_filename=local_filename)
+            print('Downloading', local_filename)
             http_download(local_filename,url)
 
 if __name__ == "__main__":

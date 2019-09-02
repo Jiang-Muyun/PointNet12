@@ -178,7 +178,7 @@ class PointNetDenseCls(nn.Module):
         self.bns2 = nn.BatchNorm1d(256)
         self.bns3 = nn.BatchNorm1d(128)
 
-    def forward(self, point_cloud,label):
+    def forward(self, point_cloud, label):
         batchsize,_ , n_pts = point_cloud.size()
         # point_cloud_transformed
         trans = self.stn(point_cloud)
@@ -209,7 +209,7 @@ class PointNetDenseCls(nn.Module):
         net = self.fc3(net) # [B,16]
 
         # segmentation network
-        out_max = torch.cat([out_max,label],1)
+        out_max = torch.cat([out_max, label],1)
         expand = out_max.view(-1, 2048+16, 1).repeat(1, 1, n_pts)
         concat = torch.cat([expand, out1, out2, out3, out4, out5], 1)
         net2 = F.relu(self.bns1(self.convs1(concat)))
@@ -263,7 +263,7 @@ class PointNetLoss(torch.nn.Module):
         self.mat_diff_loss_scale = mat_diff_loss_scale
         self.weight = weight
 
-    def forward(self, labels_pred, label, seg_pred,seg, trans_feat):
+    def forward(self, labels_pred, label, seg_pred, seg, trans_feat):
         seg_loss = F.nll_loss(seg_pred, seg)
         mat_diff_loss = feature_transform_reguliarzer(trans_feat)
         label_loss = F.nll_loss(labels_pred, label)
