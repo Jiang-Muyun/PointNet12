@@ -103,7 +103,7 @@ def train(args):
     else:
         model = PointNet2PartSegMsg_one_hot(num_part)
 
-    if args.pretrain is not None:
+    if args.pretrain is not None and args.pretrain != 'None':
         log.debug('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
         init_epoch = int(args.pretrain[:-4].split('-')[-1])
@@ -134,14 +134,13 @@ def train(args):
         model.cuda()
         log.debug('Using single GPU:',device_ids)
 
-    criterion = PointNetLoss()
-    LEARNING_RATE_CLIP = 1e-5
-
     history = defaultdict(lambda: list())
     best_acc = 0
     best_class_avg_iou = 0
     best_inctance_avg_iou = 0
+    LEARNING_RATE_CLIP = 1e-5
 
+    # criterion = PointNetLoss()
     def feature_transform_reguliarzer(trans):
         d = trans.size()[1]
         I = torch.eye(d)[None, :, :]

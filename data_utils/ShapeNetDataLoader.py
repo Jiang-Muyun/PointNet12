@@ -91,9 +91,11 @@ class PartNormalDataset(Dataset):
             pointcloud = point_cloud_normalize(pointcloud)
             
         if self.data_augmentation:
+            pointcloud = np.expand_dims(pointcloud,axis=0)
             pointcloud = rotate_point_cloud(pointcloud)
             pointcloud = jitter_point_cloud(pointcloud).astype(np.float32)
-            
+            pointcloud = np.squeeze(pointcloud, axis=0)
+
         # resample
         choice = np.random.choice(len(seg), self.npoints, replace=True)
         pointcloud = pointcloud[choice, :]
