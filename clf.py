@@ -20,7 +20,7 @@ import log
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 
-def parse_args():
+def parse_args(manual = None):
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='decay rate of learning rate')
     parser.add_argument('--feature_transform', default=False, help="use feature transform in pointnet")
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return auto_complete(parser.parse_args(),'clf')
+    return auto_complete(parser.parse_args(manual),'clf')
 
 root = select_avaliable([
     '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
