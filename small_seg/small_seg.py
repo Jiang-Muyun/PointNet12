@@ -7,7 +7,7 @@ import torch
 import torchvision.transforms as T
 import torch.nn.functional as F
 
-# model = models.segmentation.fcn_resnet101(pretrained=True).cuda().eval()
+model = models.segmentation.fcn_resnet101(pretrained=True).cuda().eval()
 model = models.segmentation.deeplabv3_resnet101(pretrained=1).cuda().eval()
 
 label_colors = np.array([(0, 0, 0),
@@ -30,4 +30,3 @@ pred = inter.max(axis = 1)[1]
 print(pred.shape)
 plt.imshow(pred.cpu().numpy()[0])
 plt.show()
-
