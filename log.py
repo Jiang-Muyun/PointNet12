@@ -12,12 +12,17 @@ def print_base(fn_color,*args, **kwargs):
     tmp = ''
     end = '\n'
     for msg in args:
+        if isinstance(msg,float):
+            msg = '%.5f' % msg
         tmp += '%s ' % (fn_color(msg))
     for k in kwargs.keys():
         if k == 'end':
             end = kwargs['end']
         else:
-            tmp += '%s: %s ' % (yellow(k), fn_color(kwargs[k]))
+            msg = kwargs[k]
+            if isinstance(msg,float):
+                msg = '%.5f' % msg
+            tmp += '%s: %s ' % (yellow(k), fn_color(msg))
     print(tmp)
 
 def debug(*args, **kwargs):

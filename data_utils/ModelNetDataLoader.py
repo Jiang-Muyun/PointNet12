@@ -5,7 +5,6 @@ from torch.utils.data import Dataset
 import sys
 from .augmentation import rotate_point_cloud, jitter_point_cloud
 
-def gray(x):    return '\033[90m' + str(x) + '\033[0m'
 class_names = ['airplane','bathtub','bed','bench','bookshelf','bottle',
                 'bowl','car','chair','cone','cup','curtain','desk','door',
                 'dresser','flower_pot','glass_box','guitar','keyboard','lamp',
@@ -14,8 +13,7 @@ class_names = ['airplane','bathtub','bed','bench','bookshelf','bottle',
                 'table','tent','toilet','tv_stand','vase','wardrobe','xbox']
 
 def load_h5(h5_filename):
-    print(gray(h5_filename))
-    f = h5py.File(h5_filename)
+    f = h5py.File(h5_filename,'r')
     data = f['data'][:]
     label = f['label'][:]
     seg = []
