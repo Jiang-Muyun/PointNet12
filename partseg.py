@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=0, help='input batch size')
-    parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
+    parser.add_argument('--workers', type=int, default=0, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
@@ -92,11 +92,10 @@ def train(args):
     test_ds = PartNormalDataset(root,cache,npoints=2048, split='test')
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
     
-    log.info("The number of training data is:",len(train_ds))
-    log.info("The number of test data is:", len(test_ds))
-
     num_classes = 16
     num_part = 50
+    log.info(len_training=len(train_ds), len_testing=len(test_ds))
+    log.info(num_classes=num_classes, num_part=num_part)
 
     if args.model_name == 'pointnet':
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)

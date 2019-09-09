@@ -7,6 +7,7 @@ from torch.autograd import Variable
 from tqdm import tqdm
 from collections import defaultdict
 import datetime
+import multiprocessing
 import pandas as pd
 import torch.nn.functional as F
 import sys
@@ -36,7 +37,6 @@ def auto_complete(args,job):
     assert args.model_name in ['pointnet','pointnet2'], args.model_name
     args.gpu_count = len(args.gpu.split(','))
 
-    log.info(job=job, model_name=args.model_name)
     if args.pretrain is None:
         args.pretrain = pretrained[job][args.model_name]
         log.info(pretrain=args.pretrain)
@@ -47,6 +47,9 @@ def auto_complete(args,job):
     if args.batch_size == 0:
         args.batch_size = args.gpu_count * batch_size[args.model_name]
         log.info(batch_size=args.batch_size, gpu_count=args.gpu_count)
+
+    if args.workers == 0:
+        args.workers = int(multiprocessing.cpu_count()/2)
 
     return args
 

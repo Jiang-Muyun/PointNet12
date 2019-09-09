@@ -61,7 +61,7 @@ class PartNormalDataset(Dataset):
                 self.datapath.append(fn)
 
         self.classes = dict(zip(self.category, range(len(self.category))))
-        print('classes',self.classes.keys())
+        # print('classes',self.classes.keys())
 
         self.seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43],
                             'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46],
