@@ -16,7 +16,6 @@ from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class
 import torch.nn.functional as F
 from pathlib import Path
 from utils import test_semseg, select_avaliable, mkdir, auto_complete
-from utils import Tick,Tock,ff
 import log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
@@ -188,8 +187,8 @@ def train(args):
         else:
             log.info('No need to save model')
 
-        log.warn('Curr',accuracy=ff(test_metrics['accuracy']), meanIOU=ff(mean_iou))
-        log.warn('Best',accuracy=ff(best_acc), meanIOU=ff(best_meaniou))
+        log.warn('Curr',accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
+        log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)
 
 
 def evaluate(args):
@@ -221,7 +220,7 @@ def evaluate(args):
         pointnet2 = args.model_name == 'pointnet2'
     )
     mean_iou = np.mean(cat_mean_iou)
-    log.info(Test_accuracy=ff(test_metrics['accuracy']), Test_meanIOU=ff(mean_iou))
+    log.info(Test_accuracy=test_metrics['accuracy'], Test_meanIOU=mean_iou)
 
 def vis(args):
     test_data, test_label = _load(load_train = False)

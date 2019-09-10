@@ -88,7 +88,7 @@ def topview_example2():
 
     try:
         while True:
-            with Tick():
+            with log.Tick():
                 frame = next(topview)
             vid.write(frame)
             cv2.imshow('topview', frame)
@@ -113,7 +113,6 @@ def projection_example1():
     cv2.imshow('projection result', result)
     cv2.waitKey(0)
 
-from utils import Tick, Tock
 def projection_example2():
     """ save video about projecting velodyne points into camera image """
 
@@ -129,10 +128,10 @@ def projection_example2():
     res = test.velo_projection(v_fov=v_fov, h_fov=h_fov)
     try:
         while True:
-            with Tick():
-                with Tock():
+            with log.Tick():
+                with log.Tock():
                     frame, point, color = next(res)
-                with Tock(str(point.shape)):
+                with log.Tock(str(point.shape)):
                     image = print_projection_cv2(point, color, frame)
             vid.write(image)
             cv2.imshow('projection', image)
@@ -157,5 +156,5 @@ if __name__ == "__main__":
     topview_example2()
 
     # projection_example1()
-    # projection_example2()
+    projection_example2()
 

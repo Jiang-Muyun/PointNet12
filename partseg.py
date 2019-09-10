@@ -17,7 +17,6 @@ from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
 from pathlib import Path
 from utils import test_partseg, select_avaliable, mkdir, auto_complete
-from utils import Tick,Tock,ff
 import log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSegMsg_one_hot
@@ -215,13 +214,11 @@ def train(args):
         else:
             log.info('No need to save model')
 
-        log.warn('Curr', accuracy=ff(test_metrics['accuracy']),
-            class_avg_mIOU = ff(test_metrics['class_avg_iou']), 
-            inctance_avg_mIOU = ff(test_metrics['inctance_avg_iou']))
+        log.warn('Curr', accuracy=test_metrics['accuracy'],class_avg_mIOU = test_metrics['class_avg_iou'], 
+                            inctance_avg_mIOU = test_metrics['inctance_avg_iou'])
 
-        log.warn('Best', accuracy=ff(best_acc),
-            class_avg_mIOU = ff(best_class_avg_iou), 
-            inctance_avg_mIOU = ff(best_inctance_avg_iou))
+        log.warn('Best', accuracy=best_acc,class_avg_mIOU = best_class_avg_iou, 
+                            inctance_avg_mIOU = best_inctance_avg_iou)
 
 def evaluate(args):
     cache = _load(root)

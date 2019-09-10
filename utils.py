@@ -57,9 +57,6 @@ def mkdir(fn):
     os.makedirs(fn, exist_ok=True)
     return fn
 
-def ff(num):
-    return '%.5f'%(num)
-
 def select_avaliable(fn_list):
     selected = None
     for fn in fn_list:
@@ -70,49 +67,6 @@ def select_avaliable(fn_list):
         log.err(log.yellow("Could not find dataset from"), fn_list)
     else:
         return selected
-
-class Tick():
-    def __init__(self, name='', silent=False):
-        self.name = name
-        self.silent = silent
-
-    def __enter__(self):
-        self.t_start = time.time()
-        if not self.silent:
-            print(log.cyan('> %s ... ' % (self.name)), end='')
-            sys.stdout.flush()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.t_end = time.time()
-        self.delta = self.t_end-self.t_start
-        self.fps = 1/self.delta
-
-        if not self.silent:
-            print(log.cyan('[%.0f ms]' % (self.delta * 1000)))
-            sys.stdout.flush()
-
-
-class Tock():
-    def __init__(self, name=None, report_time=True):
-        self.name = '' if name == None else name+': '
-        self.report_time = report_time
-
-    def __enter__(self):
-        self.t_start = time.time()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.t_end = time.time()
-        self.delta = self.t_end-self.t_start
-        self.fps = 1/self.delta
-        if self.report_time:
-            print(log.yellow('(%s%.0fms) ' % (self.name, self.delta * 1000)), end='')
-        else:
-            print(log.yellow('.'), end='')
-        sys.stdout.flush()
-
-
 
 def to_categorical(y, num_classes):
     """ 1-hot encodes a tensor """
