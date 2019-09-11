@@ -154,8 +154,8 @@ if __name__ == "__main__":
     # pano_example2()
     
     # topview_example1()
-    # topview_example2()
+    topview_example2()
 
-    projection_example1()
-    # projection_example2()
+    # projection_example1()
+    projection_example2()
 
