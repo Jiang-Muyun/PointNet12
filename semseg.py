@@ -16,7 +16,7 @@ from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class
 import torch.nn.functional as F
 from pathlib import Path
 from utils import test_semseg, select_avaliable, mkdir, auto_complete
-import log
+import my_log as log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2SemSeg
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer

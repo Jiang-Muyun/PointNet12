@@ -5,9 +5,10 @@ import cv2
 from kitti_foundation import KITTI,KITTI_Util
 import sys
 sys.path.append('.')
-import log
+import my_log as log
 
-root = '/media/james/MyPassport/James/dataset/KITTI/raw/2011_09_26/'
+# root = '/media/james/MyPassport/James/dataset/KITTI/raw/2011_09_26/'
+root = '/media/james/Ubuntu_Data/dataset/KITTI/raw/2011_09_26/'
 velo_path = os.path.join(root, '2011_09_26_drive_0005_sync/velodyne_points/data')
 image_path = os.path.join(root, '2011_09_26_drive_0005_sync/image_02/data')
 
@@ -153,8 +154,8 @@ if __name__ == "__main__":
     # pano_example2()
     
     # topview_example1()
-    topview_example2()
+    # topview_example2()
 
-    # projection_example1()
-    projection_example2()
+    projection_example1()
+    # projection_example2()
 

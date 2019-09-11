@@ -17,7 +17,7 @@ from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
 from pathlib import Path
 from utils import test_partseg, select_avaliable, mkdir, auto_complete
-import log
+import my_log as log
 from tqdm import tqdm
 from model.pointnet2 import PointNet2PartSegMsg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss

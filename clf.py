@@ -15,7 +15,7 @@ from data_utils.ModelNetDataLoader import ModelNetDataLoader, load_data, class_n
 from pathlib import Path
 from tqdm import tqdm
 from utils import test, save_checkpoint, select_avaliable, mkdir, auto_complete
-import log
+import my_log as log
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 

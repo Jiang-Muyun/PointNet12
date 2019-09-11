@@ -1,6 +1,9 @@
 import torch
 import numpy as np
 
+def num(x):
+    return x.detach().cpu().numpy()
+
 def chamfer_non_batch(p1, p2):
     '''
     Calculate Chamfer Distance between two point sets
@@ -33,21 +36,15 @@ def chamfer_batch(p1, p2):
     :param p2: size[B, M, D]
     :return: sum of all batches of Chamfer Distance of two point sets
     '''
-
     assert p1.size(0) == p2.size(0) and p1.size(2) == p2.size(2)
 
     p1 = p1.unsqueeze(1)
     p2 = p2.unsqueeze(1)
-    # print('unsqueeze', p1.size(), p2.size())
 
     p1 = p1.repeat(1, p2.size(2), 1, 1)
-    # print('repeat p1', p1.size())
-
     p1 = p1.transpose(1, 2)
-    # print('transpose p1', p1.size())
 
     p2 = p2.repeat(1, p1.size(1), 1, 1)
-    # print('repeat p2', p2.size())
 
     dist = torch.add(p1, torch.neg(p2))
     dist = torch.norm(dist, 2, dim=3)

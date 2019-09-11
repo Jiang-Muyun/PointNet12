@@ -10,7 +10,7 @@ def magenta(x): return '\033[95m' + str(x) + '\033[0m'
 def cyan(x):    return '\033[96m' + str(x) + '\033[0m'
 def white(x):   return '\033[97m' + str(x) + '\033[0m'
 
-def print_base(fn_color,*args, **kwargs):
+def fmt(fn_color, *args, **kwargs):
     tmp = ''
     end = '\n'
     for msg in args:
@@ -24,8 +24,12 @@ def print_base(fn_color,*args, **kwargs):
             msg = kwargs[k]
             if isinstance(msg,float):
                 msg = '%.5f' % msg
-            tmp += '%s: %s ' % (white(k), fn_color(msg))
-    print(tmp)
+            tmp += '%s: %s ' % (cyan(k), fn_color(msg))
+    tmp += end
+    return tmp
+
+def print_base(fn_color, *args, **kwargs):
+    print(fmt(fn_color, *args, **kwargs),end='')
 
 def debug(*args, **kwargs):
     print_base(gray, *args, **kwargs)

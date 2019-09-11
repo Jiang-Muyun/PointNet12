@@ -11,7 +11,7 @@ import multiprocessing
 import pandas as pd
 import torch.nn.functional as F
 import sys
-import log
+import my_log as log
 import time
 
 pretrained={
@@ -48,8 +48,8 @@ def auto_complete(args,job):
         args.batch_size = args.gpu_count * batch_size[args.model_name]
         log.info(batch_size=args.batch_size, gpu_count=args.gpu_count)
 
-    if args.workers == 0:
-        args.workers = int(multiprocessing.cpu_count()/2)
+    # if args.workers == 0:
+    #     args.workers = int(multiprocessing.cpu_count()/2)
 
     return args
 
