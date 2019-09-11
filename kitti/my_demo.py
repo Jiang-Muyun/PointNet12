@@ -34,13 +34,13 @@ image_path = os.path.join(root, '2011_09_26_drive_0005_sync/image_02/data')
 v2c = os.path.join(root,'calib_velo_to_cam.txt')
 c2c = os.path.join(root,'calib_cam_to_cam.txt')
 
-v_fov, h_fov = (-24.9, 2.0), (-90, 90)
+v_fov, h_fov = (-25, 2.0), (-40.5, 40.5)
 
-res = KITTI_Util(frame=0,camera_path=image_path, velo_path=velo_path,v2c_path=v2c, c2c_path=c2c)
+res = KITTI_Util(frame=89,camera_path=image_path, velo_path=velo_path,v2c_path=v2c, c2c_path=c2c)
 
 img, points, color = res.velo_projection_frame(v_fov=v_fov, h_fov=h_fov)
 log.warn(total = res.num_frame, img=img.shape, points=points.shape, color=color.shape)
 result = print_projection_cv2(points, color, img)
 
-cv2.imshow('projection result', result)
-cv2.waitKey(0)
+# cv2.imshow('projection result', result)
+# cv2.waitKey(0)
