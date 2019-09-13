@@ -378,14 +378,17 @@ class KITTI_Util(KITTI):
             if self.__h_fov[1] == self.__h_max and self.__h_fov[0] == self.__h_min and \
                             self.__v_fov[1] == self.__v_max and self.__v_fov[0] == self.__v_min:
                 pass
+
             elif self.__h_fov[1] == self.__h_max and self.__h_fov[0] == self.__h_min:
                 con = self.__hv_in_range(d, z, self.__v_fov, fov_type='v')
                 lim_x, lim_y, lim_z, lim_d = self.__x[con], self.__y[con], self.__z[con], self.__d[con]
                 self.__x, self.__y, self.__z, self.__d = lim_x, lim_y, lim_z, lim_d
+            
             elif self.__v_fov[1] == self.__v_max and self.__v_fov[0] == self.__v_min:
                 con = self.__hv_in_range(x, y, self.__h_fov, fov_type='h')
                 lim_x, lim_y, lim_z, lim_d = self.__x[con], self.__y[con], self.__z[con], self.__d[con]
                 self.__x, self.__y, self.__z, self.__d = lim_x, lim_y, lim_z, lim_d
+            
             else:
                 h_points = self.__hv_in_range(x, y, self.__h_fov, fov_type='h')
                 v_points = self.__hv_in_range(d, z, self.__v_fov, fov_type='v')
@@ -394,7 +397,7 @@ class KITTI_Util(KITTI):
                 self.__x, self.__y, self.__z, self.__d = lim_x, lim_y, lim_z, lim_d
         else:
             pass
-
+        
         if self.__x_range is None and self.__y_range is None and self.__z_range is None:
             pass
         elif self.__x_range is not None and self.__y_range is not None and self.__z_range is not None:

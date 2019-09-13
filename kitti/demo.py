@@ -102,13 +102,15 @@ def topview_example2():
 
 def projection_example1():
     """ save one frame about projecting velodyne points into camera image """
-    v_fov, h_fov = (-24.9, 2.0), (-90, 90)
+    # v_fov, h_fov = (-24.9, 2.0), (-90, 90)
+    h_fov = (-40.5, 40.5)
+    v_fov = (-25, 2.0)
 
     res = KITTI_Util(frame=89, camera_path=image_path, velo_path=velo_path, \
                     v2c_path=v2c_filepath, c2c_path=c2c_filepath)
 
-    img, points, color = res.velo_projection_frame(v_fov=v_fov, h_fov=h_fov)
-    log.info(total = res.num_frame, img=img.shape, points=points.shape, color=color.shape)
+    img, points_2d, color = res.velo_projection_frame(v_fov=v_fov, h_fov=h_fov)
+    log.info(total = res.num_frame, img=img.shape, points_2d=points_2d.shape, color=color.shape)
     result = print_projection_cv2(points, color, img)
 
     cv2.imshow('projection result', result)
@@ -117,7 +119,8 @@ def projection_example1():
 def projection_example2():
     """ save video about projecting velodyne points into camera image """
 
-    v_fov, h_fov = (-24.9, 2.0), (-90, 90)
+    h_fov = (-40, 40)
+    v_fov = (-25, 2.0)
     temp = KITTI(frame=0, camera_path=image_path)
     img = temp.camera_file
     size = (img.shape[1], img.shape[0])
@@ -154,7 +157,7 @@ if __name__ == "__main__":
     # pano_example2()
     
     # topview_example1()
-    topview_example2()
+    # topview_example2()
 
     # projection_example1()
     projection_example2()
