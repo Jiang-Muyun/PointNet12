@@ -1,8 +1,8 @@
 import os
 import numpy as np
+from PIL import Image
 import glob
 import cv2
-from kitti_foundation import KITTI,KITTI_Util
 import sys
 sys.path.append('.')
 import my_log as log
@@ -154,7 +154,7 @@ def extract_points(points, h_fov, v_fov):
 
     return xyz_, color
 
-def velo_2_img_projection(points, fn_v2c, fn_c2c, h_fov, v_fov):
+def velo_2_img_projection(points, fn_v2c, fn_c2c, h_fov = None, v_fov = None):
     """ convert velodyne coordinates to camera image coordinates """
 
     # rough velodyne azimuth range corresponding to camera horizontal fov
@@ -177,7 +177,7 @@ def velo_2_img_projection(points, fn_v2c, fn_c2c, h_fov, v_fov):
     c_    - color value(HSV's Hue vaule) corresponding to distance(m)
 
                 [x_1 , x_2 , .. ]
-    xyz_v =  [y_1 , y_2 , .. ]
+    xyz_v   =   [y_1 , y_2 , .. ]
                 [z_1 , z_2 , .. ]
                 [ 1  ,  1  , .. ]
     """
@@ -199,9 +199,9 @@ def velo_2_img_projection(points, fn_v2c, fn_c2c, h_fov, v_fov):
 
     """
     xyz_c - 3D velodyne points corresponding to h, v FOV in the camera coordinates
-                [x_1 , x_2 , .. ]
-    xyz_c =  [y_1 , y_2 , .. ]
-                [z_1 , z_2 , .. ]
+               [x_1 , x_2 , .. ]
+    xyz_c   =  [y_1 , y_2 , .. ]
+               [z_1 , z_2 , .. ]
     """
     xyz_c = np.delete(xyz_v, 3, axis=0)
 
@@ -213,7 +213,7 @@ def velo_2_img_projection(points, fn_v2c, fn_c2c, h_fov, v_fov):
     xy_i - 3D velodyne points corresponding to h, v FOV in the image(pixel) coordinates before scale adjustment
     ans  - 3D velodyne points corresponding to h, v FOV in the image(pixel) coordinates
                 [s_1*x_1 , s_2*x_2 , .. ]
-    xy_i =   [s_1*y_1 , s_2*y_2 , .. ]        ans =   [x_1 , x_2 , .. ]
+    xy_i    =   [s_1*y_1 , s_2*y_2 , .. ]        ans =   [x_1 , x_2 , .. ]
                 [  s_1   ,   s_2   , .. ]                [y_1 , y_2 , .. ]
     """
     xy_i = xyz_c[::] / xyz_c[::][2]
@@ -223,8 +223,9 @@ def velo_2_img_projection(points, fn_v2c, fn_c2c, h_fov, v_fov):
 
 if __name__ == "__main__":
     root = '/media/james/Ubuntu_Data/dataset/KITTI/raw/2011_09_26/'
-    velo_path = os.path.join(root, '2011_09_26_drive_0005_sync/velodyne_points/data/')
-    image_path = os.path.join(root, '2011_09_26_drive_0005_sync/image_02/data/')
+    part = '2011_09_26_drive_0001_sync'
+    velo_path = os.path.join(root, '%s/velodyne_points/data/'%(part))
+    image_path = os.path.join(root, '%s/image_02/data/'%(part))
     fn_v2c = os.path.join(root,'calib_velo_to_cam.txt')
     fn_c2c = os.path.join(root,'calib_cam_to_cam.txt')
     h_fov = (-40, 40)
@@ -233,16 +234,23 @@ if __name__ == "__main__":
     i = 0
     while True:
         with log.Tick():
-            fn_frame = os.path.join(image_path, '%010d.png' % (i))
+            fn_frame = os.path.join(image_path, '%010d.jpg' % (i))
             fn_velo = os.path.join(velo_path, '%010d.bin' %(i))
 
-            if not os.path.exists(fn_frame) or not os.path.exists(fn_velo):
-                break
+            if not os.path.exists(fn_frame):
+                fn_frame = os.path.join(image_path, '%010d.png' % (i))
 
-            frame = cv2.imread(fn_frame)
-            points = np.fromfile(fn_velo, dtype=np.float32)
+                if not os.path.exists(fn_frame) or not os.path.exists(fn_velo):
+                    print('End of the sequence')
+                    break
+            
             with log.Tock():
+                frame = cv2.imread(fn_frame)
+                # frame = np.array(Image.open(fn_frame))[:,:,::-1]
+                points = np.fromfile(fn_velo, dtype=np.float32)
                 points_3d = points.reshape(-1, 4)[:,:3]
+            
+            with log.Tock():
                 points_2d, color = velo_2_img_projection(points_3d, fn_v2c, fn_c2c, h_fov, v_fov)
 
             result = print_projection_cv2(points_2d, color, frame)
@@ -250,6 +258,6 @@ if __name__ == "__main__":
 
             i += 1
 
-        if 27 == cv2.waitKey(0):
+        if 27 == cv2.waitKey(1):
             break
         
