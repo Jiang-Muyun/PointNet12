@@ -231,14 +231,14 @@ if __name__ == "__main__":
     h_fov = (-40, 40)
     v_fov = (-25, 2.0)
 
-    i = 0
+    index = 0
     while True:
         with log.Tick():
-            fn_frame = os.path.join(image_path, '%010d.jpg' % (i))
-            fn_velo = os.path.join(velo_path, '%010d.bin' %(i))
+            fn_frame = os.path.join(image_path, '%010d.jpg' % (index))
+            fn_velo = os.path.join(velo_path, '%010d.bin' %(index))
 
             if not os.path.exists(fn_frame):
-                fn_frame = os.path.join(image_path, '%010d.png' % (i))
+                fn_frame = os.path.join(image_path, '%010d.png' % (index))
 
                 if not os.path.exists(fn_frame) or not os.path.exists(fn_velo):
                     print('End of the sequence')
@@ -256,7 +256,7 @@ if __name__ == "__main__":
             result = print_projection_cv2(points_2d, color, frame)
             cv2.imshow('projection result', result)
 
-            i += 1
+            index += 1
 
         if 27 == cv2.waitKey(1):
             break
