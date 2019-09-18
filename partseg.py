@@ -306,8 +306,8 @@ def vis(args):
             pred_color = cmap[pred.cpu().numpy() - 1, :]
 
             point_cloud = open3d.geometry.PointCloud()
-            point_cloud.points = open3d.Vector3dVector(pt.cpu().numpy())
-            point_cloud.colors = open3d.Vector3dVector(pred_color)
+            point_cloud.points = open3d.utility.Vector3dVector(pt.cpu().numpy())
+            point_cloud.colors = open3d.utility.Vector3dVector(pred_color)
 
             vis = open3d.visualization.VisualizerWithKeyCallback()
             vis.create_window()
