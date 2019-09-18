@@ -76,7 +76,8 @@ root = select_avaliable([
     '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
     '/media/james/Ubuntu_Data/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
     '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
-    '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
+    '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
+    '/media/james/HDD/James_Least/Datasets/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
 ])
 
 def train(args):
@@ -85,10 +86,11 @@ def train(args):
     cache = _load(root)
 
     norm = True if args.model_name == 'pointnet' else False
-    train_ds = PartNormalDataset(root,cache,npoints=2048, split='trainval', data_augmentation = args.augment)
+    npoints = 2048
+    train_ds = PartNormalDataset(root,cache,npoints=npoints, split='trainval', data_augmentation = args.augment)
     dataloader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=int(args.workers))
     
-    test_ds = PartNormalDataset(root,cache,npoints=2048, split='test')
+    test_ds = PartNormalDataset(root,cache,npoints=npoints, split='test')
     testdataloader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=int(args.workers))
     
     num_classes = 16

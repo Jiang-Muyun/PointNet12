@@ -39,7 +39,7 @@ root = select_avaliable([
     '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
     '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
     '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-    '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/modelnet40_ply_hdf5_2048/'
+    '/media/james/HDD/James_Least/Datasets/ShapeNet/modelnet40_ply_hdf5_2048/'
 ])
 
 def train(args):
