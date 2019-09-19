@@ -249,6 +249,7 @@ class PointNetSeg(nn.Module):
         x = x.view(batchsize, n_pts, self.k)
         return x, trans_feat
 
+
 def feature_transform_reguliarzer(trans):
     d = trans.size()[1]
     I = torch.eye(d)[None, :, :]

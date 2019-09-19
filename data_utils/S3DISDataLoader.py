@@ -66,7 +66,9 @@ class S3DISDataLoader(Dataset):
         label = self.labels[index]
         
         if self.data_augmentation:
-            #pointcloud = rotate_point_cloud(pointcloud)
-            pointcloud = jitter_point_cloud(pointcloud).astype(np.float32)
+            pcd = np.expand_dims(pcd,axis=0)
+            # pcd = rotate_point_cloud(pcd)
+            pcd = jitter_point_cloud(pcd).astype(np.float32)
+            pcd = np.squeeze(pcd, axis=0)
 
         return pointcloud, label

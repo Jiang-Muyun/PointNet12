@@ -26,6 +26,10 @@ pretrained={
     'semseg':{
         'pointnet':'experiment/weights/semseg-pointnet-0.83657-0055.pth',
         'pointnet2':'experiment/weights/semseg-pointnet2-0.87168-0096.pth'
+    },
+    'kitti_semseg':{
+        'pointnet': None,
+        'pointnet2': None,
     }
 }
 batch_size = {
@@ -33,7 +37,7 @@ batch_size = {
     'pointnet2': 8,
 }
 def auto_complete(args,job):
-    assert job in ['clf' ,'partseg', 'semseg'], job
+    assert job in ['clf' ,'partseg', 'semseg', 'kitti_semseg'], job
     assert args.model_name in ['pointnet','pointnet2'], args.model_name
     args.gpu_count = len(args.gpu.split(','))
 

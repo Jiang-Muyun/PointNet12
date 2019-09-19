@@ -101,7 +101,7 @@ class PartNormalDataset(Dataset):
         pointcloud = pointcloud[choice, :]
         seg = seg[choice]
         normal = normal[choice, :]
-        return pointcloud,cls_id, seg, normal
+        return pointcloud, cls_id, seg, normal
 
     def __len__(self):
         return len(self.datapath)

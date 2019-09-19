@@ -3,7 +3,7 @@ import warnings
 import h5py
 from torch.utils.data import Dataset
 import sys
-from .augmentation import rotate_point_cloud, jitter_point_cloud
+from .augmentation import rotate_point_cloud, jitter_point_cloud, point_cloud_normalize
 
 class_names = ['airplane','bathtub','bed','bench','bookshelf','bottle',
                 'bowl','car','chair','cone','cup','curtain','desk','door',
@@ -49,10 +49,10 @@ def load_data(path,train=True,classification = True):
 
 
 class ModelNetDataLoader(Dataset):
-    def __init__(self, data, labels, data_augmentation = False):
+    def __init__(self, data, labels, augmentation = False):
         self.data = data
         self.labels = labels
-        self.data_augmentation = data_augmentation
+        self.augmentation = augmentation
 
     def __len__(self):
         return len(self.data)
@@ -62,7 +62,9 @@ class ModelNetDataLoader(Dataset):
         label = self.labels[index]
 
         if self.data_augmentation:
-            pointcloud = rotate_point_cloud(pointcloud)
-            pointcloud = jitter_point_cloud(pointcloud).astype(np.float32)
+            pcd = np.expand_dims(pcd,axis=0)
+            pcd = rotate_point_cloud(pcd)
+            pcd = jitter_point_cloud(pcd).astype(np.float32)
+            pcd = np.squeeze(pcd, axis=0)
 
         return pointcloud, label
