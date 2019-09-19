@@ -111,7 +111,6 @@ def train(args):
             model = model.train()
 
             if args.model_name == 'pointnet':
-                print(points.shape)
                 pred, trans_feat = model(points)
             else:
                 pred = model(points[:,:3,:],points[:,3:,:])

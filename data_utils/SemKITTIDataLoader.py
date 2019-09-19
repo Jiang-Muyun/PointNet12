@@ -25,11 +25,11 @@ def load_parts(fn_h5,parts):
 
 
 def load_data(root, train = False):
-    # test_data, test_label = load_parts(root, ['08','09','10'])
-    test_data, test_label = load_parts(root, ['04'])
+    test_data, test_label = load_parts(root, ['08','09','10'])
+    # test_data, test_label = load_parts(root, ['04'])
     if train:
-        # train_data, train_label = load_parts(root, ['00','01','02','03','04','05','06','07'])
-        train_data, train_label = load_parts(root, ['03'])
+        train_data, train_label = load_parts(root, ['00','01','02','03','04','05','06','07'])
+        # train_data, train_label = load_parts(root, ['03'])
         return train_data, train_label, test_data, test_label
     else:
         return test_data, test_label
