@@ -25,12 +25,14 @@ from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
 
 def parse_args():
     parser = argparse.ArgumentParser('PointNet')
+    # pretrain = 'experiment/kitti_semseg/pointnet/semseg-pointnet-0.29528-0039.pth'
+    pretrain = None
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=0, help='input batch size')
-    parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
+    parser.add_argument('--workers', type=int, default=6, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
-    parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
+    parser.add_argument('--pretrain', type=str, default=pretrain, help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
@@ -39,6 +41,10 @@ def parse_args():
     return parser.parse_args()
 
 root = 'experiment/pts_sem_voxel_0.2.h5'
+from data_utils.SemKITTIDataLoader import reduced_class_names
+seg_label_to_cat = {}
+for i,cat in enumerate(reduced_class_names):
+    seg_label_to_cat[i] = cat
 
 def train(args):
     experiment_dir = mkdir('experiment/')
@@ -51,20 +57,11 @@ def train(args):
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    num_classes = 20
+    num_classes = 7
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes,feature_transform=True, semseg=False)
     else:
         model = PointNet2SemSeg(num_classes)
-
-    if args.pretrain is not None:
-        log.debug('Use pretrain model...')
-        model.load_state_dict(torch.load(args.pretrain))
-        init_epoch = int(args.pretrain[:-4].split('-')[-1])
-        log.debug('start epoch from', init_epoch)
-    else:
-        log.debug('Training from scratch')
-        init_epoch = 0
 
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -80,14 +77,19 @@ def train(args):
     LEARNING_RATE_CLIP = 1e-5
 
     device_ids = [int(x) for x in args.gpu.split(',')]
-    if len(device_ids) >= 2:
-        torch.backends.cudnn.benchmark = True
-        model.cuda(device_ids[0])
-        model = torch.nn.DataParallel(model, device_ids=device_ids)
-        log.debug('Using multi GPU:',device_ids)
+    torch.backends.cudnn.benchmark = True
+    model.cuda(device_ids[0])
+    model = torch.nn.DataParallel(model, device_ids=device_ids)
+    log.debug('Using DataParallel:',device_ids)
+    
+    if args.pretrain is not None:
+        log.debug('Use pretrain model...')
+        model.load_state_dict(torch.load(args.pretrain))
+        init_epoch = int(args.pretrain[:-4].split('-')[-1])
+        log.debug('start epoch from', init_epoch)
     else:
-        model.cuda()
-        log.debug('Using single GPU:',device_ids)
+        log.debug('Training from scratch')
+        init_epoch = 0
 
     history = defaultdict(lambda: list())
     best_acc = 0
@@ -131,7 +133,7 @@ def train(args):
 
         test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
             model.eval(), 
-            testdataloader, 
+            testdataloader,
             seg_label_to_cat,
             num_classes = num_classes,
             pointnet2 = args.model_name == 'pointnet2'
@@ -144,6 +146,7 @@ def train(args):
         
         if mean_iou > best_meaniou:
             best_meaniou = mean_iou
+            save_model = True
         
         if save_model:
             fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
@@ -155,6 +158,44 @@ def train(args):
 
         log.warn('Curr',accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
         log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)
+
+def evaluate(args):
+    test_data, test_label = load_data(root, train = False)
+    test_dataset = SemKITTIDataLoader(test_data, test_label)
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
+    
+    log.debug('Building Model', args.model_name)
+    num_classes = 7
+    if args.model_name == 'pointnet':
+        model = PointNetSeg(num_classes,feature_transform=True, semseg=False)
+    else:
+        model = PointNet2SemSeg(num_classes) 
+
+    device_ids = [int(x) for x in args.gpu.split(',')]
+    torch.backends.cudnn.benchmark = True
+    model.cuda(device_ids[0])
+    model = torch.nn.DataParallel(model, device_ids=device_ids)
+    log.debug('Using DataParallel:',device_ids)
+    
+    if args.pretrain is None:
+        log.err('No pretrain model')
+        return
+
+    log.debug('Loading pretrain model...')
+    checkpoint = torch.load(args.pretrain)
+    model.load_state_dict(checkpoint)
+    model.cuda()
+
+    test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
+        model.eval(), 
+        testdataloader, 
+        seg_label_to_cat,
+        num_classes = num_classes,
+        pointnet2 = args.model_name == 'pointnet2'
+    )
+    mean_iou = np.mean(cat_mean_iou)
+    log.info(Test_accuracy=test_metrics['accuracy'], Test_meanIOU=mean_iou)
+
 
 if __name__ == '__main__':
     args = parse_args()

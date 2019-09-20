@@ -178,6 +178,7 @@ def train(args):
         
         if mean_iou > best_meaniou:
             best_meaniou = mean_iou
+            save_model = True
         
         if save_model:
             fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)

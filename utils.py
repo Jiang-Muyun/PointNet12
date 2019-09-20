@@ -237,7 +237,6 @@ def test_semseg(model, loader, catdict, num_classes = 13, pointnet2=False):
 
     return metrics, hist_acc, cat_iou
 
-
 def compute_avg_curve(y, n_points_avg):
     avg_kernel = np.ones((n_points_avg,)) / n_points_avg
     rolling_mean = np.convolve(y, avg_kernel, mode='valid')
