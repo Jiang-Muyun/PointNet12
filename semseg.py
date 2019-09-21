@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return auto_complete(parser.parse_args(),'semseg')
+    return parser.parse_args()
 
 def _load(load_train = True):
     dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.h5'
@@ -91,6 +91,12 @@ def train(args):
     else:
         model = PointNet2SemSeg(num_classes) 
 
+    device_ids = [int(x) for x in args.gpu.split(',')]
+    torch.backends.cudnn.benchmark = True
+    model.cuda(device_ids[0])
+    model = torch.nn.DataParallel(model, device_ids=device_ids)
+    log.debug('Using DataParallel:',device_ids)
+
     if args.pretrain is not None:
         log.debug('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
@@ -112,16 +118,6 @@ def train(args):
             
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
     LEARNING_RATE_CLIP = 1e-5
-
-    device_ids = [int(x) for x in args.gpu.split(',')]
-    if len(device_ids) >= 2:
-        torch.backends.cudnn.benchmark = True
-        model.cuda(device_ids[0])
-        model = torch.nn.DataParallel(model, device_ids=device_ids)
-        log.debug('Using multi GPU:',device_ids)
-    else:
-        model.cuda()
-        log.debug('Using single GPU:',device_ids)
 
     history = defaultdict(lambda: list())
     best_acc = 0
@@ -184,9 +180,10 @@ def train(args):
             fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            log.info(cat_mean_iou)
+            log.warn(cat_mean_iou)
         else:
             log.info('No need to save model')
+            log.warn(cat_mean_iou)
 
         log.warn('Curr',accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
         log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)

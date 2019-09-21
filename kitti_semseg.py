@@ -21,18 +21,18 @@ from tqdm import tqdm
 from utils import test_semseg, select_avaliable, mkdir, auto_complete
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
+
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
+from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name
 
 def parse_args():
     parser = argparse.ArgumentParser('PointNet')
-    # pretrain = 'experiment/kitti_semseg/pointnet/semseg-pointnet-0.29528-0039.pth'
-    pretrain = None
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=0, help='input batch size')
     parser.add_argument('--workers', type=int, default=6, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
-    parser.add_argument('--pretrain', type=str, default=pretrain, help='whether use pretrain model')
+    parser.add_argument('--pretrain', type=str, default = None, help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
@@ -40,24 +40,19 @@ def parse_args():
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     return parser.parse_args()
 
-root = 'experiment/pts_sem_voxel_0.2.h5'
-from data_utils.SemKITTIDataLoader import reduced_class_names
-seg_label_to_cat = {}
-for i,cat in enumerate(reduced_class_names):
-    seg_label_to_cat[i] = cat
+root = 'experiment/pts_sem_voxel_0.1.h5'
 
 def train(args):
     experiment_dir = mkdir('experiment/')
     checkpoints_dir = mkdir('experiment/kitti_semseg/%s/'%(args.model_name))
     train_data, train_label, test_data, test_label = load_data(root, train = True)
 
-    dataset = SemKITTIDataLoader(train_data, train_label, data_augmentation = args.augment)
+    dataset = SemKITTIDataLoader(train_data, train_label, npoints = 6000, data_augmentation = args.augment)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    num_classes = 7
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes,feature_transform=True, semseg=False)
     else:
@@ -134,7 +129,7 @@ def train(args):
         test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
             model.eval(), 
             testdataloader,
-            seg_label_to_cat,
+            label_id_to_name,
             num_classes = num_classes,
             pointnet2 = args.model_name == 'pointnet2'
         )
@@ -152,20 +147,20 @@ def train(args):
             fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            log.info(cat_mean_iou)
+            log.warn(cat_mean_iou)
         else:
             log.info('No need to save model')
+            log.warn(cat_mean_iou)
 
         log.warn('Curr',accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
         log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)
 
 def evaluate(args):
-    test_data, test_label = load_data(root, train = False)
+    _,_,test_data, test_label = load_data(root, train = False)
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
     log.debug('Building Model', args.model_name)
-    num_classes = 7
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes,feature_transform=True, semseg=False)
     else:
@@ -189,13 +184,13 @@ def evaluate(args):
     test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
         model.eval(), 
         testdataloader, 
-        seg_label_to_cat,
+        label_id_to_name,
         num_classes = num_classes,
         pointnet2 = args.model_name == 'pointnet2'
     )
     mean_iou = np.mean(cat_mean_iou)
     log.info(Test_accuracy=test_metrics['accuracy'], Test_meanIOU=mean_iou)
-
+    log.warn(mean_iou)
 
 if __name__ == '__main__':
     args = parse_args()
