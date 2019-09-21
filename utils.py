@@ -119,14 +119,15 @@ def test(model, loader):
         mean_correct.append(correct.item()/float(points.size()[0]))
     return np.mean(mean_correct)
 
-def compute_cat_iou(pred,target,iou_tabel):
+def compute_cat_iou(pred, target, num_classes ,iou_tabel):
     iou_list = []
     target = target.cpu().data.numpy()
     for j in range(pred.size(0)):
         batch_pred = pred[j]
         batch_target = target[j]
         batch_choice = batch_pred.data.max(1)[1].cpu().data.numpy()
-        for cat in np.unique(batch_target):
+        for cat in nrange(num_classes):
+            print(j,cat)
             # intersection = np.sum((batch_target == cat) & (batch_choice == cat))
             # union = float(np.sum((batch_target == cat) | (batch_choice == cat)))
             # iou = intersection/union if not union ==0 else 1
@@ -140,6 +141,20 @@ def compute_cat_iou(pred,target,iou_tabel):
             iou_tabel[cat,1] += 1
             iou_list.append(iou)
     return iou_tabel,iou_list
+
+def calc_categorical_iou(pred, target, num_classes ,iou_tabel):
+    choice = pred.max(2)[1]
+    target.squeeze_(-1)
+    for cat in range(num_classes):
+        I = torch.sum((choice == cat) & (target == cat)).float()
+        U = torch.sum((choice == cat) | (target == cat)).float()
+        if U == 0:
+            iou = 1
+        else:
+            iou = (I / U).cpu().numpy()
+        iou_tabel[cat,0] += iou
+        iou_tabel[cat,1] += 1
+    return iou_tabel
 
 def compute_overall_iou(pred, target, num_classes):
     shape_ious = []
@@ -203,22 +218,23 @@ def test_partseg(model, loader, catdict, num_classes = 50, forpointnet2=False):
 
     return metrics, hist_acc, cat_iou
 
-def test_semseg(model, loader, catdict, num_classes = 13, pointnet2=False):
+def test_semseg(model, loader, catdict, model_name, num_classes):
     iou_tabel = np.zeros((len(catdict),3))
     metrics = defaultdict(lambda:list())
-    hist_acc = []
     
     for batch_id, (points, target) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
         batchsize, num_point, _ = points.size()
         points, target = Variable(points.float()), Variable(target.long())
         points = points.transpose(2, 1)
         points, target = points.cuda(), target.cuda()
-        if pointnet2:
-            pred = model(points[:, :3, :], points[:, 3:, :])
-        else:
+        if model_name == 'pointnet':
             pred, _ = model(points)
-        # print(pred.size())
-        iou_tabel, iou_list = compute_cat_iou(pred,target,iou_tabel)
+        else:
+            pred = model(points)
+
+        # iou_tabel, iou_list = compute_cat_iou(pred,target,num_classes,iou_tabel)
+        iou_tabel = calc_categorical_iou(pred,target,num_classes,iou_tabel)
+
         # shape_ious += compute_overall_iou(pred, target, num_classes)
         pred = pred.contiguous().view(-1, num_classes)
         target = target.view(-1, 1)[:, 0]
@@ -227,15 +243,14 @@ def test_semseg(model, loader, catdict, num_classes = 13, pointnet2=False):
         metrics['accuracy'].append(correct.item()/ (batchsize * num_point))
 
     iou_tabel[:,2] = iou_tabel[:,0] /iou_tabel[:,1]
-    hist_acc += metrics['accuracy']
     metrics['accuracy'] = np.mean(metrics['accuracy'])
     metrics['iou'] = np.mean(iou_tabel[:, 2])
+
     iou_tabel = pd.DataFrame(iou_tabel,columns=['iou','count','mean_iou'])
     iou_tabel['Category_IOU'] = [catdict[i] for i in range(len(catdict)) ]
-    # print(iou_tabel)
     cat_iou = iou_tabel.groupby('Category_IOU')['mean_iou'].mean()
 
-    return metrics, hist_acc, cat_iou
+    return metrics, cat_iou
 
 def compute_avg_curve(y, n_points_avg):
     avg_kernel = np.ones((n_points_avg,)) / n_points_avg

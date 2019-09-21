@@ -106,9 +106,9 @@ label_id_to_name = {i:cat for i,cat in enumerate(reduced_class_names)}
 mapping_list = [reduced_class_names.index(mapping[name]) for name in class_names]
 mapping = np.array(mapping_list,dtype=np.int32)
 
-def process_data(tmp):
-    data = tmp[:,:3].astype(np.float32)
-    label = mapping[tmp[:,3].astype(np.uint8)]
+def process_data(fp,key):
+    data = fp[key+'/pt'][()].astype(np.float32)
+    label = mapping[fp[key+'/label'][()].astype(np.uint8)]
     # label = tmp[:,3].astype(np.uint8)
     # mark_removed = label != 3
     # data = data[mark_removed]
@@ -117,6 +117,7 @@ def process_data(tmp):
 
 def load_data(root, train = False):
     part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
+    # part_length = {'04':270}
     fp = h5py.File(root,'r')
     train_data, train_label, test_data, test_label= [],[],[],[]
 
@@ -127,18 +128,17 @@ def load_data(root, train = False):
             key = '%s/%06d'%(part, index)
 
             if index < length * 0.4:
-                data,label = process_data(fp[key][()])
+                data,label = process_data(fp, key)
                 test_data.append(data)
                 test_label.append(label)
             
             if train and index >= length * 0.4:
-                data,label = process_data(fp[key][()])
+                data,label = process_data(fp, key)
                 train_data.append(data)
                 train_label.append(label)
             
     fp.close()
     return train_data, train_label, test_data, test_label
-
 
 
 class SemKITTIDataLoader(Dataset):
@@ -157,13 +157,15 @@ class SemKITTIDataLoader(Dataset):
         label = self.labels[index]
 
         if self.normalize:
-            pcd = pcd/50
+            pcd[:,0] = pcd[:,0] / 70
+            pcd[:,1] = pcd[:,1] / 70
+            pcd[:,2] = pcd[:,2] / 3
+            pcd[:,3] = (pcd[:,3] - 0.5)/2
             pcd = np.clip(pcd,-1,1)
-            # pcd = point_cloud_normalize(pcd)
 
         if self.data_augmentation:
             pcd = np.expand_dims(pcd,axis=0)
-            pcd = rotate_point_cloud(pcd)
+            # pcd = rotate_point_cloud(pcd)
             pcd = jitter_point_cloud(pcd).astype(np.float32)
             pcd = np.squeeze(pcd, axis=0)
         
@@ -183,6 +185,6 @@ def print_distro(labels):
     print((np.array(count)/total*100).astype(np.int))
 
 if __name__ == "__main__":
-    train_data, train_label, test_data, test_label = load_data('experiment/pts_sem_voxel_0.2.h5',True)
+    train_data, train_label, test_data, test_label = load_data('experiment/pts_sem_voxel_0.10.h5',True)
     print_distro(train_label)
     print_distro(test_label)

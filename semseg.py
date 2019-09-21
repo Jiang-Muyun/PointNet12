@@ -143,7 +143,7 @@ def train(args):
             if args.model_name == 'pointnet':
                 pred, trans_feat = model(points)
             else:
-                pred = model(points[:,:3,:],points[:,3:,:])
+                pred = model(points)
 
             pred = pred.contiguous().view(-1, num_classes)
             target = target.view(-1, 1)[:, 0]
@@ -159,7 +159,7 @@ def train(args):
         log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
-        test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
+        test_metrics, cat_mean_iou = test_semseg(
             model.eval(), 
             testdataloader, 
             seg_label_to_cat,
@@ -210,7 +210,7 @@ def evaluate(args):
     model.load_state_dict(checkpoint)
     model.cuda()
 
-    test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
+    test_metrics, cat_mean_iou = test_semseg(
         model.eval(), 
         testdataloader, 
         seg_label_to_cat,
@@ -250,7 +250,7 @@ def vis(args):
         points = points.transpose(2, 1)
         points, target = points.cuda(), target.cuda()
         if args.model_name == 'pointnet2':
-            pred = model(points[:, :3, :], points[:, 3:, :])
+            pred = model(points)
         else:
             pred, _ = model(points)
 

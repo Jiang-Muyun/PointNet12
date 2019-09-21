@@ -40,23 +40,23 @@ def parse_args():
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     return parser.parse_args()
 
-root = 'experiment/pts_sem_voxel_0.1.h5'
+root = 'experiment/pts_sem_voxel_0.10.h5'
 
 def train(args):
     experiment_dir = mkdir('experiment/')
     checkpoints_dir = mkdir('experiment/kitti_semseg/%s/'%(args.model_name))
     train_data, train_label, test_data, test_label = load_data(root, train = True)
 
-    dataset = SemKITTIDataLoader(train_data, train_label, npoints = 6000, data_augmentation = args.augment)
+    dataset = SemKITTIDataLoader(train_data, train_label, npoints = 5000, data_augmentation = args.augment)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
     test_dataset = SemKITTIDataLoader(test_data, test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
     
     if args.model_name == 'pointnet':
-        model = PointNetSeg(num_classes,feature_transform=True, semseg=False)
+        model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
     else:
-        model = PointNet2SemSeg(num_classes)
+        model = PointNet2SemSeg(num_classes, feature_dims = 1)
 
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -99,7 +99,7 @@ def train(args):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
-        for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader),smoothing=0.9):
+        for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader), smoothing=0.9):
             points, target = data
             points, target = Variable(points.float()), Variable(target.long())
             points = points.transpose(2, 1)
@@ -110,7 +110,7 @@ def train(args):
             if args.model_name == 'pointnet':
                 pred, trans_feat = model(points)
             else:
-                pred = model(points[:,:3,:],points[:,3:,:])
+                pred = model(points)
 
             pred = pred.contiguous().view(-1, num_classes)
             target = target.view(-1, 1)[:, 0]
@@ -126,12 +126,12 @@ def train(args):
         log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
-        test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
+        test_metrics, cat_mean_iou = test_semseg(
             model.eval(), 
             testdataloader,
             label_id_to_name,
+            args.model_name,
             num_classes = num_classes,
-            pointnet2 = args.model_name == 'pointnet2'
         )
         mean_iou = np.mean(cat_mean_iou)
 
@@ -162,9 +162,9 @@ def evaluate(args):
     
     log.debug('Building Model', args.model_name)
     if args.model_name == 'pointnet':
-        model = PointNetSeg(num_classes,feature_transform=True, semseg=False)
+        model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
     else:
-        model = PointNet2SemSeg(num_classes) 
+        model = PointNet2SemSeg(num_classes)
 
     device_ids = [int(x) for x in args.gpu.split(',')]
     torch.backends.cudnn.benchmark = True
@@ -181,12 +181,12 @@ def evaluate(args):
     model.load_state_dict(checkpoint)
     model.cuda()
 
-    test_metrics, test_hist_acc, cat_mean_iou = test_semseg(
+    test_metrics, cat_mean_iou = test_semseg(
         model.eval(), 
         testdataloader, 
         label_id_to_name,
+        args.model_name,
         num_classes = num_classes,
-        pointnet2 = args.model_name == 'pointnet2'
     )
     mean_iou = np.mean(cat_mean_iou)
     log.info(Test_accuracy=test_metrics['accuracy'], Test_meanIOU=mean_iou)

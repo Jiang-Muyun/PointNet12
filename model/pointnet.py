@@ -84,10 +84,10 @@ class STNkd(nn.Module):
         return x
 
 class PointNetEncoder(nn.Module):
-    def __init__(self, global_feat=True, feature_transform=False, semseg = False):
+    def __init__(self, global_feat=True, input_dims = 4, feature_transform=False):
         super(PointNetEncoder, self).__init__()
-        self.stn = STN3d() if not semseg else STNkd(k=9)
-        self.conv1 = torch.nn.Conv1d(3, 64, 1) if not semseg else torch.nn.Conv1d(9, 64, 1)
+        self.stn = STNkd(k = input_dims)
+        self.conv1 = torch.nn.Conv1d(input_dims, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
         self.conv3 = torch.nn.Conv1d(128, 1024, 1)
         self.bn1 = nn.BatchNorm1d(64)
@@ -223,10 +223,10 @@ class PointNetDenseCls(nn.Module):
         return net, net2, trans_feat
 
 class PointNetSeg(nn.Module):
-    def __init__(self,num_class,feature_transform=False, semseg = False):
+    def __init__(self,num_class,input_dims=4,feature_transform=False):
         super(PointNetSeg, self).__init__()
         self.k = num_class
-        self.feat = PointNetEncoder(global_feat=False,feature_transform=feature_transform, semseg = semseg)
+        self.feat = PointNetEncoder(global_feat=False,input_dims = input_dims, feature_transform=feature_transform)
         self.conv1 = torch.nn.Conv1d(1088, 512, 1)
         self.conv2 = torch.nn.Conv1d(512, 256, 1)
         self.conv3 = torch.nn.Conv1d(256, 128, 1)
