@@ -202,7 +202,9 @@ from visualizer.kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
 
 def vis(args):
     args = parse_args()
-    args.pretrain = 'experiment/kitti_semseg/pointnet/kitti_semseg-pointnet-0.53106-0053.pth'
+    args.model_name = 'pointnet2'
+    args.pretrain = 'experiment/kitti_semseg/pointnet2/kitti_semseg-pointnet2-0.59957-0023.pth'
+    # args.pretrain = 'experiment/kitti_semseg/pointnet/kitti_semseg-pointnet-0.53106-0053.pth'
     _,_,test_data, test_label = load_data(args.h5, train = False, selected = ['03'])
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
