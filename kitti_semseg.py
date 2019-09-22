@@ -19,11 +19,11 @@ from pathlib import Path
 import my_log as log
 from tqdm import tqdm
 
-from utils import test_semseg, select_avaliable, mkdir, auto_complete
+from utils import test_semseg, select_avaliable, mkdir
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
-from data_utils.SemKITTIDataLoader import SemKITTIDataLoader,SemKITTIDataLoader_AllPoints, load_data
+from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
 from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, reduced_class_names, reduced_colors
 
 
@@ -218,7 +218,7 @@ def train(args):
 
 def evaluate(args):
     if args.model_name == 'pointnet':
-        args.pretrain = 'experiment/weights/kitti_semseg-pointnet-0.53106-0053.pth'
+        args.pretrain = 'experiment/weights/kitti_semseg-pointnet-0.51178-0053.pth'
     else:
         args.pretrain = 'experiment/weights/kitti_semseg-pointnet2-0.59957-0023.pth'
 
@@ -258,13 +258,22 @@ def evaluate(args):
     log.warn(cat_mean_iou)
     log.info('Curr', accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
 
+from visualizer.kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
+
 def vis(args):
+    part = '03'
+    kitti_root = ''
+    cfg_data = json.load(open('visualizer/ego_view.json'))
+    handle = Semantic_KITTI_Utils(root = )
+    handle.set_filter(cfg_data['h_fov'], cfg_data['v_fov'])
+    handle.set_part(part)
+
     args = parse_args()
     if args.model_name == 'pointnet':
         args.pretrain = 'experiment/weights/kitti_semseg-pointnet-0.53106-0053.pth'
     else:
         args.pretrain = 'experiment/weights/kitti_semseg-pointnet2-0.59957-0023.pth'
-    _,_,test_data, test_label = load_data(args.h5, train = False, selected = ['03'])
+    _,_,test_data, test_label = load_data(args.h5, train = False, selected = [part])
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
