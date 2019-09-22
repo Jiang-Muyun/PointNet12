@@ -2,8 +2,10 @@ import open3d
 import argparse
 import os
 import time
+import json
 import h5py
 import datetime
+import cv2
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -26,14 +28,13 @@ from model.pointnet2 import PointNet2SemSeg
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
 from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, reduced_class_names, reduced_colors
 
-
 class Window_Manager():
     def __init__(self):
-        self.param = open3d.io.read_pinhole_camera_parameters('visualizer/ego_view.json')
+        self.param = open3d.io.read_pinhole_camera_parameters('config/ego_view.json')
         self.vis = open3d.visualization.VisualizerWithKeyCallback()
         self.vis.create_window(width=800, height=800, left=100)
         self.vis.register_key_callback(32, lambda vis: exit())
-        self.vis.get_render_option().load_from_json('visualizer/render_option.json')
+        self.vis.get_render_option().load_from_json('config/render_option.json')
         self.pcd = open3d.geometry.PointCloud()
     
     def update(self, pts_3d, colors):
@@ -45,6 +46,9 @@ class Window_Manager():
         self.vis.update_geometry()
         self.vis.poll_events()
         self.vis.update_renderer()
+
+    def capture_screen(self,fn):
+        self.vis.capture_screen_image(fn, False)
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
@@ -258,15 +262,16 @@ def evaluate(args):
     log.warn(cat_mean_iou)
     log.info('Curr', accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
 
-from visualizer.kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
+from kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
 
 def vis(args):
     part = '03'
-    kitti_root = ''
-    cfg_data = json.load(open('visualizer/ego_view.json'))
-    handle = Semantic_KITTI_Utils(root = )
+    KITTI_ROOT = '/media/james/Ubuntu_Data/dataset/KITTI/odometry/dataset/'
+    cfg_data = json.load(open('config/ego_view.json'))
+    handle = Semantic_KITTI_Utils(root = KITTI_ROOT)
     handle.set_filter(cfg_data['h_fov'], cfg_data['v_fov'])
     handle.set_part(part)
+    vis_handle = Window_Manager()
 
     args = parse_args()
     if args.model_name == 'pointnet':
@@ -296,8 +301,6 @@ def vis(args):
     model.cuda()
     model.eval()
 
-    handle = Window_Manager()
-
     for i in range(100, len(test_data)):
         points = torch.from_numpy(test_data[i]).unsqueeze(0)
         points = points.transpose(2, 1).cuda()
@@ -311,10 +314,30 @@ def vis(args):
             else:
                 pred = model(points)
             pred_choice = pred.data.max(-1)[1].cpu().squeeze_(0).numpy()
+            sem_label = pred_choice
 
         pts_3d = test_data[i][:,:3].copy()
-        handle.update(pts_3d, reduced_colors[pred_choice])
+        colors = reduced_colors[pred_choice]
+        vis_handle.update(pts_3d, colors)
+        mkdir('experiment/imgs/%s/'%(args.model_name))
+        vis_handle.capture_screen('experiment/imgs/%s/%d_3d.png'%(args.model_name,i))
+
+        handle.load(i)
+        pts_2d, color = handle.project_3d_to_2d(test_data[i][:,:3])
+
+        img_semantic = handle.frame.copy()
+        pts = pts_2d.astype(np.int32).tolist()
+
+        for (x,y),c in zip(pts, colors.tolist()):
+            cv2.circle(img_semantic, (x, y), 2, [c[2],c[1],c[0]], -1)
+
+        cv2.imshow('semantic', img_semantic)
+        cv2.imwrite('experiment/imgs/%s/%d_sem.png'%(args.model_name, i), img_semantic)
+
         print(i, pred_choice.shape)
+
+        if 32 == cv2.waitKey(1):
+            break
 
 if __name__ == '__main__':
     args = parse_args()
