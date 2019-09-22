@@ -23,29 +23,32 @@ from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
-from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name
+from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, reduced_class_names, reduced_colors
 
-def parse_args(manual = None):
+def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
-    parser.add_argument('--batch_size', type=int, default=0, help='input batch size')
+    parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
     parser.add_argument('--workers', type=int, default=6, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default = None, help='whether use pretrain model')
+    parser.add_argument('--h5', type=str, default = 'experiment/pts_sem_voxel_0.10.h5', help='pts h5 file')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return parser.parse_args(manual)
+    if notebook:
+        return parser.parse_args([])
+    else:
+        return parser.parse_args()
 
-root = 'experiment/pts_sem_voxel_0.10.h5'
 
 def train(args):
     experiment_dir = mkdir('experiment/')
     checkpoints_dir = mkdir('experiment/kitti_semseg/%s/'%(args.model_name))
-    train_data, train_label, test_data, test_label = load_data(root, train = True)
+    train_data, train_label, test_data, test_label = load_data(args.h5, train = True)
 
     dataset = SemKITTIDataLoader(train_data, train_label, npoints = 5000, data_augmentation = args.augment)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
@@ -156,7 +159,7 @@ def train(args):
         log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)
 
 def evaluate(args):
-    _,_,test_data, test_label = load_data(root, train = False)
+    _,_,test_data, test_label = load_data(args.h5, train = False)
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
     
@@ -193,12 +196,17 @@ def evaluate(args):
     log.warn(mean_iou)
     log.warn(cat_mean_iou)
 
+from visualizer.kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
+
+# vis_handle = PointCloud_Vis(args.cfg, new_config = args.modify)
+
 def vis(args):
-    args.pre_trained = 'experiment/kitti_semseg/pointnet/kitti_semseg-pointnet-0.53106-0053.pth'
-    _,_,test_data, test_label = load_data(root, train = False, debug = True)
+    args = parse_args()
+    args.pretrain = 'experiment/kitti_semseg/pointnet/kitti_semseg-pointnet-0.53106-0053.pth'
+    _,_,test_data, test_label = load_data(args.h5, train = False, selected = ['03'])
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
-    
+
     log.debug('Building Model', args.model_name)
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
@@ -210,32 +218,51 @@ def vis(args):
     model.cuda(device_ids[0])
     model = torch.nn.DataParallel(model, device_ids=device_ids)
     log.debug('Using DataParallel:',device_ids)
-    
+
     if args.pretrain is None:
         log.err('No pretrain model')
-        return
 
     log.debug('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda()
+    model.eval()
 
-    with torch.no_grad():
-        for batch_id, (points, target) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
-            batchsize, num_point, _ = points.size()
-            points, target = Variable(points.float()), Variable(target.long())
-            points = points.transpose(2, 1)
-            points, target = points.cuda(), target.cuda()
+    param = open3d.io.read_pinhole_camera_parameters('visualizer/ego_view.json')
+    vis = open3d.visualization.VisualizerWithKeyCallback()
+    vis.create_window(width=800, height=800, left=100)
+    vis.register_key_callback(32, lambda vis: exit())
+    vis.get_render_option().load_from_json('visualizer/render_option.json')
+    point_cloud = open3d.geometry.PointCloud()
+
+    for i in range(len(test_data)):
+        points = torch.from_numpy(test_data[i]).unsqueeze(0)
+        points = points.transpose(2, 1).cuda()
+        points[:,0] = points[:,0] / 70
+        points[:,1] = points[:,1] / 70
+        points[:,2] = points[:,2] / 3
+        points[:,3] = (points[:,3] - 0.5)/2
+        with torch.no_grad():
             if args.model_name == 'pointnet':
                 pred, _ = model(points)
             else:
                 pred = model(points)
+            pred_choice = pred.data.max(-1)[1].cpu().numpy()
+        torch.cuda.empty_cache()
+        pcd = test_data[i][:,:3].copy()
+        choice = pred_choice[0]
+        colors = np.array(reduced_colors,dtype=np.uint8)[choice]
+        print(pcd.shape,choice.shape, colors.shape)
+        
+        point_cloud.points = open3d.utility.Vector3dVector(pcd)
+        point_cloud.colors = open3d.utility.Vector3dVector(colors/255)
 
-            pred = pred.contiguous().view(-1, num_classes)
-            target = target.view(-1, 1)[:, 0]
-            pred_choice = pred.data.max(1)[1]
-            print(target.shape)
-            print(pred_choice.shape)
+        vis.remove_geometry(point_cloud)
+        vis.add_geometry(point_cloud)
+        vis.get_view_control().convert_from_pinhole_camera_parameters(param)
+        vis.update_geometry()
+        vis.poll_events()
+        vis.update_renderer()
 
 if __name__ == '__main__':
     args = parse_args()

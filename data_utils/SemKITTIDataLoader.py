@@ -102,6 +102,7 @@ mapping = {
 }
 num_classes = 6
 reduced_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
+reduced_colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
 label_id_to_name = {i:cat for i,cat in enumerate(reduced_class_names)}
 mapping_list = [reduced_class_names.index(mapping[name]) for name in class_names]
 mapping = np.array(mapping_list,dtype=np.int32)
@@ -115,15 +116,15 @@ def process_data(fp,key):
     # label = label[mark_removed]
     return data, label
 
-def load_data(root, train = False, debug = False):
-    if debug:
-        part_length = {'04':270}
-    else:
-        part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
+def load_data(root, train = False, selected = None):
+    part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
+    if selected is None:
+        selected = part_length.keys()
+    
     fp = h5py.File(root,'r')
     train_data, train_label, test_data, test_label= [],[],[],[]
 
-    for part in part_length.keys():
+    for part in selected:
         length = part_length[part]
 
         for index in tqdm(range(length), desc=' > Loading %s: %s'%(part, length)):
