@@ -222,25 +222,26 @@ def test_semseg(model, loader, catdict, model_name, num_classes):
     iou_tabel = np.zeros((len(catdict),3))
     metrics = defaultdict(lambda:list())
     
-    for batch_id, (points, target) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
-        batchsize, num_point, _ = points.size()
-        points, target = Variable(points.float()), Variable(target.long())
-        points = points.transpose(2, 1)
-        points, target = points.cuda(), target.cuda()
-        if model_name == 'pointnet':
-            pred, _ = model(points)
-        else:
-            pred = model(points)
+    with torch.no_grad():
+        for batch_id, (points, target) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
+            batchsize, num_point, _ = points.size()
+            points, target = Variable(points.float()), Variable(target.long())
+            points = points.transpose(2, 1)
+            points, target = points.cuda(), target.cuda()
+            if model_name == 'pointnet':
+                pred, _ = model(points)
+            else:
+                pred = model(points)
 
-        # iou_tabel, iou_list = compute_cat_iou(pred,target,num_classes,iou_tabel)
-        iou_tabel = calc_categorical_iou(pred,target,num_classes,iou_tabel)
+            # iou_tabel, iou_list = compute_cat_iou(pred,target,num_classes,iou_tabel)
+            iou_tabel = calc_categorical_iou(pred,target,num_classes,iou_tabel)
 
-        # shape_ious += compute_overall_iou(pred, target, num_classes)
-        pred = pred.contiguous().view(-1, num_classes)
-        target = target.view(-1, 1)[:, 0]
-        pred_choice = pred.data.max(1)[1]
-        correct = pred_choice.eq(target.data).cpu().sum()
-        metrics['accuracy'].append(correct.item()/ (batchsize * num_point))
+            # shape_ious += compute_overall_iou(pred, target, num_classes)
+            pred = pred.contiguous().view(-1, num_classes)
+            target = target.view(-1, 1)[:, 0]
+            pred_choice = pred.data.max(1)[1]
+            correct = pred_choice.eq(target.data).cpu().sum()
+            metrics['accuracy'].append(correct.item()/ (batchsize * num_point))
 
     iou_tabel[:,2] = iou_tabel[:,0] /iou_tabel[:,1]
     metrics['accuracy'] = np.mean(metrics['accuracy'])

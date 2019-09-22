@@ -25,7 +25,7 @@ from model.pointnet2 import PointNet2SemSeg
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
 from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name
 
-def parse_args():
+def parse_args(manual = None):
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return parser.parse_args()
+    return parser.parse_args(manual)
 
 root = 'experiment/pts_sem_voxel_0.10.h5'
 
@@ -144,7 +144,7 @@ def train(args):
             save_model = True
         
         if save_model:
-            fn_pth = 'semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
+            fn_pth = 'kitti_semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
             log.warn(cat_mean_iou)
@@ -158,7 +158,7 @@ def train(args):
 def evaluate(args):
     _,_,test_data, test_label = load_data(root, train = False)
     test_dataset = SemKITTIDataLoader(test_data, test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
     
     log.debug('Building Model', args.model_name)
     if args.model_name == 'pointnet':
@@ -191,6 +191,51 @@ def evaluate(args):
     mean_iou = np.mean(cat_mean_iou)
     log.info(Test_accuracy=test_metrics['accuracy'], Test_meanIOU=mean_iou)
     log.warn(mean_iou)
+    log.warn(cat_mean_iou)
+
+def vis(args):
+    args.pre_trained = 'experiment/kitti_semseg/pointnet/kitti_semseg-pointnet-0.53106-0053.pth'
+    _,_,test_data, test_label = load_data(root, train = False, debug = True)
+    test_dataset = SemKITTIDataLoader(test_data, test_label)
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+    
+    log.debug('Building Model', args.model_name)
+    if args.model_name == 'pointnet':
+        model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
+    else:
+        model = PointNet2SemSeg(num_classes)
+
+    device_ids = [int(x) for x in args.gpu.split(',')]
+    torch.backends.cudnn.benchmark = True
+    model.cuda(device_ids[0])
+    model = torch.nn.DataParallel(model, device_ids=device_ids)
+    log.debug('Using DataParallel:',device_ids)
+    
+    if args.pretrain is None:
+        log.err('No pretrain model')
+        return
+
+    log.debug('Loading pretrain model...')
+    checkpoint = torch.load(args.pretrain)
+    model.load_state_dict(checkpoint)
+    model.cuda()
+
+    with torch.no_grad():
+        for batch_id, (points, target) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
+            batchsize, num_point, _ = points.size()
+            points, target = Variable(points.float()), Variable(target.long())
+            points = points.transpose(2, 1)
+            points, target = points.cuda(), target.cuda()
+            if args.model_name == 'pointnet':
+                pred, _ = model(points)
+            else:
+                pred = model(points)
+
+            pred = pred.contiguous().view(-1, num_classes)
+            target = target.view(-1, 1)[:, 0]
+            pred_choice = pred.data.max(1)[1]
+            print(target.shape)
+            print(pred_choice.shape)
 
 if __name__ == '__main__':
     args = parse_args()
