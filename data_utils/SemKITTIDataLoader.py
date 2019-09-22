@@ -103,6 +103,7 @@ mapping = {
 num_classes = 6
 reduced_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
 reduced_colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
+reduced_colors = np.array(reduced_colors,np.uint8)
 label_id_to_name = {i:cat for i,cat in enumerate(reduced_class_names)}
 mapping_list = [reduced_class_names.index(mapping[name]) for name in class_names]
 mapping = np.array(mapping_list,dtype=np.int32)
@@ -175,28 +176,6 @@ class SemKITTIDataLoader(Dataset):
         choice = np.random.choice(pcd.shape[0], self.npoints, replace=True)
         pcd = pcd[choice]
         label = label[choice]
-        return pcd, label
-
-
-class SemKITTIDataLoader_AllPoints(Dataset):
-    def __init__(self, data, labels):
-        self.data = data
-        self.labels = labels
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, index):
-        pcd = self.data[index]
-        label = self.labels[index]
-
-        if self.normalize:
-            pcd[:,0] = pcd[:,0] / 70
-            pcd[:,1] = pcd[:,1] / 70
-            pcd[:,2] = pcd[:,2] / 3
-            pcd[:,3] = (pcd[:,3] - 0.5)/2
-            pcd = np.clip(pcd,-1,1)
-            
         return pcd, label
 
 def print_distro(labels):

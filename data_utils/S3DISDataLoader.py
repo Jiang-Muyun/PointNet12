@@ -9,6 +9,10 @@ from .augmentation import rotate_point_cloud, jitter_point_cloud
 classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
 class2label = {cls: i for i,cls in enumerate(classes)}
 
+label_id_to_name = {}
+for i,cat in enumerate(class2label.keys()):
+    label_id_to_name[i] = cat
+
 def getDataFiles(list_filename):
     return [line.rstrip() for line in open(list_filename)]
 

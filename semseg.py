@@ -12,45 +12,45 @@ import torch.utils.data
 from torch.utils.data import DataLoader
 from collections import defaultdict
 from torch.autograd import Variable
-from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data,class2label
 import torch.nn.functional as F
 from pathlib import Path
-from utils import test_semseg, select_avaliable, mkdir, auto_complete
 import my_log as log
 from tqdm import tqdm
+
+from utils import test_semseg, select_avaliable, mkdir
+from data_utils.S3DISDataLoader import S3DISDataLoader, recognize_all_data, label_id_to_name
 from model.pointnet2 import PointNet2SemSeg
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 
-seg_classes = class2label
-seg_label_to_cat = {}
-for i,cat in enumerate(seg_classes.keys()):
-    seg_label_to_cat[i] = cat
-
-def parse_args():
+def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
-    parser.add_argument('--batch_size', type=int, default=0, help='input batch size')
+    parser.add_argument('--batch_size', type=int, default=16, help='input batch size')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
-    parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
+    parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return parser.parse_args()
+    if notebook:
+        return parser.parse_args([])
+    else:
+        return parser.parse_args()
+
+root = select_avaliable([
+    '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+    '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+    '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
+    '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
+])
 
 def _load(load_train = True):
     dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.h5'
     if not os.path.exists(dataset_tmp):
         log.info('Loading data...')
-        root = select_avaliable([
-            '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
-            '/media/james/Ubuntu_Data/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
-            '/media/james/MyPassport/James/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/',
-            '/home/james/dataset/ShapeNet/indoor3d_sem_seg_hdf5_data/'
-        ])
         train_data, train_label, test_data, test_label = recognize_all_data(root, test_area = 5)
         fp_h5 = h5py.File(dataset_tmp,"w")
         fp_h5.create_dataset('train_data', data = train_data)
@@ -87,15 +87,13 @@ def train(args):
 
     num_classes = 13
     if args.model_name == 'pointnet':
-        model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
+        model = PointNetSeg(num_classes, feature_transform=True, input_dims = 9)
     else:
-        model = PointNet2SemSeg(num_classes) 
+        model = PointNet2SemSeg(num_classes, feature_dims = 6)
 
-    device_ids = [int(x) for x in args.gpu.split(',')]
     torch.backends.cudnn.benchmark = True
-    model.cuda(device_ids[0])
-    model = torch.nn.DataParallel(model, device_ids=device_ids)
-    log.debug('Using DataParallel:',device_ids)
+    model = torch.nn.DataParallel(model).cuda()
+    log.debug('Using gpu:',args.gpu)
 
     if args.pretrain is not None:
         log.debug('Use pretrain model...')
@@ -162,9 +160,9 @@ def train(args):
         test_metrics, cat_mean_iou = test_semseg(
             model.eval(), 
             testdataloader, 
-            seg_label_to_cat,
-            num_classes = num_classes,
-            pointnet2 = args.model_name == 'pointnet2'
+            label_id_to_name,
+            args.model_name,
+            num_classes,
         )
         mean_iou = np.mean(cat_mean_iou)
 
@@ -196,26 +194,29 @@ def evaluate(args):
 
     log.debug('Building Model', args.model_name)
     num_classes = 13
-    if args.model_name == 'pointnet2':
-        model = PointNet2SemSeg(num_classes) 
+    if args.model_name == 'pointnet':
+        model = PointNetSeg(num_classes, feature_transform=True, input_dims = 9)
     else:
-        model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
+        model = PointNet2SemSeg(num_classes, feature_dims = 6) 
+
+    torch.backends.cudnn.benchmark = True
+    model = torch.nn.DataParallel(model).cuda()
+    log.debug('Using gpu:',args.gpu)
 
     if args.pretrain is None:
         log.err('No pretrain model')
         return
 
     log.debug('Loading pretrain model...')
-    checkpoint = torch.load(args.pretrain)
-    model.load_state_dict(checkpoint)
-    model.cuda()
+    state_dict = torch.load(args.pretrain)
+    model.load_state_dict(state_dict)
 
     test_metrics, cat_mean_iou = test_semseg(
         model.eval(), 
         testdataloader, 
-        seg_label_to_cat,
-        num_classes = num_classes,
-        pointnet2 = args.model_name == 'pointnet2'
+        label_id_to_name,
+        args.model_name,
+        num_classes,
     )
     mean_iou = np.mean(cat_mean_iou)
     log.info(Test_accuracy=test_metrics['accuracy'], Test_meanIOU=mean_iou)
@@ -232,6 +233,11 @@ def vis(args):
     else:
         model = PointNetSeg(num_classes,feature_transform=True,semseg = True)
 
+    torch.backends.cudnn.benchmark = True
+    model = torch.nn.DataParallel(model)
+    model.cuda()
+    log.debug('Using gpu:',args.gpu)
+
     if args.pretrain is None:
         log.err('No pretrain model')
         return
@@ -239,7 +245,8 @@ def vis(args):
     log.debug('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
-    model.cuda().eval()
+    model.eval()
+
     cmap = plt.cm.get_cmap("hsv", 13)
     cmap = np.array([cmap(i) for i in range(13)])[:, :3]
 

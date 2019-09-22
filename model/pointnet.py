@@ -129,7 +129,7 @@ class PointNetCls(nn.Module):
     def __init__(self, k=2, feature_transform=False):
         super(PointNetCls, self).__init__()
         self.feature_transform = feature_transform
-        self.feat = PointNetEncoder(global_feat=True, feature_transform=feature_transform)
+        self.feat = PointNetEncoder(global_feat=True, feature_transform=feature_transform, input_dims=3)
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, k)

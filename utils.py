@@ -14,49 +14,6 @@ import sys
 import my_log as log
 import time
 
-pretrained={
-    'clf':{
-        'pointnet':'experiment/weights/clf-pointnet-0.89730-0076.pth',
-        'pointnet2':'experiment/weights/clf-pointnet2-0.91933-0073.pth'
-    },
-    'partseg':{
-        'pointnet':'experiment/weights/partseg-pointnet-0.93402-0082.pth',
-        'pointnet2':'experiment/weights/partseg-pointnet2-0.94043-0085.pth'
-    },
-    'semseg':{
-        'pointnet':'experiment/weights/semseg-pointnet-0.83657-0055.pth',
-        'pointnet2':'experiment/weights/semseg-pointnet2-0.87168-0096.pth'
-    },
-    'kitti_semseg':{
-        'pointnet': None,
-        'pointnet2': None,
-    }
-}
-batch_size = {
-    'pointnet': 16,
-    'pointnet2': 8,
-}
-def auto_complete(args,job):
-    assert job in ['clf' ,'partseg', 'semseg', 'kitti_semseg'], job
-    assert args.model_name in ['pointnet','pointnet2'], args.model_name
-    args.gpu_count = len(args.gpu.split(','))
-
-    if args.pretrain is None:
-        args.pretrain = pretrained[job][args.model_name]
-        log.info(pretrain=args.pretrain)
-        if not os.path.exists(args.pretrain):
-            log.warn('but model not found', path=args.pretrain)
-            args.pretrain = None
-    
-    if args.batch_size == 0:
-        args.batch_size = args.gpu_count * batch_size[args.model_name]
-        log.info(batch_size=args.batch_size, gpu_count=args.gpu_count)
-
-    # if args.workers == 0:
-    #     args.workers = int(multiprocessing.cpu_count()/2)
-
-    return args
-
 def mkdir(fn):
     os.makedirs(fn, exist_ok=True)
     return fn
@@ -105,9 +62,9 @@ def save_checkpoint(epoch, train_accuracy, test_accuracy, model, optimizer, path
     }
     torch.save(state, savepath)
 
-def test(model, loader):
+def test_clf(model, loader):
     mean_correct = []
-    for j, data in enumerate(loader, 0):
+    for j, data in tqdm(enumerate(loader, 0), total=len(loader), smoothing=0.9):
         points, target = data
         target = target[:, 0]
         points = points.transpose(2, 1)
@@ -126,8 +83,7 @@ def compute_cat_iou(pred, target, num_classes ,iou_tabel):
         batch_pred = pred[j]
         batch_target = target[j]
         batch_choice = batch_pred.data.max(1)[1].cpu().data.numpy()
-        for cat in nrange(num_classes):
-            print(j,cat)
+        for cat in range(num_classes):
             # intersection = np.sum((batch_target == cat) & (batch_choice == cat))
             # union = float(np.sum((batch_target == cat) | (batch_choice == cat)))
             # iou = intersection/union if not union ==0 else 1
@@ -173,7 +129,7 @@ def compute_overall_iou(pred, target, num_classes):
         shape_ious.append(np.mean(part_ious))
     return shape_ious
 
-def test_partseg(model, loader, catdict, num_classes = 50, forpointnet2=False):
+def test_partseg(model, loader, catdict, model_name, num_classes = 50):
     ''' catdict = {0:Airplane, 1:Airplane, ...49:Table} '''
     iou_tabel = np.zeros((len(catdict),3))
     iou_list = []
@@ -187,16 +143,16 @@ def test_partseg(model, loader, catdict, num_classes = 50, forpointnet2=False):
         points = points.transpose(2, 1)
         norm_plt = norm_plt.transpose(2, 1)
         points, label, target, norm_plt = points.cuda(), label.squeeze().cuda(), target.cuda(), norm_plt.cuda()
-        if forpointnet2:
-            seg_pred = model(points, norm_plt, to_categorical(label, 16))
-        else:
+        if model_name == 'pointnet':
             labels_pred, seg_pred, _  = model(points,to_categorical(label,16))
+        else:
+            seg_pred = model(points, norm_plt, to_categorical(label, 16))
             # labels_pred_choice = labels_pred.data.max(1)[1]
             # labels_correct = labels_pred_choice.eq(label.long().data).cpu().sum()
             # mean_correct.append(labels_correct.item() / float(points.size()[0]))
         
         # print(pred.size())
-        iou_tabel, iou = compute_cat_iou(seg_pred,target,iou_tabel)
+        iou_tabel, iou = compute_cat_iou(seg_pred,target,num_classes,iou_tabel)
         iou_list+=iou
         # shape_ious += compute_overall_iou(pred, target, num_classes)
         seg_pred = seg_pred.contiguous().view(-1, num_classes)

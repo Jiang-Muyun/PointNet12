@@ -13,35 +13,41 @@ from torch.utils.data import DataLoader
 from utils import to_categorical
 from collections import defaultdict
 from torch.autograd import Variable
-from data_utils.ShapeNetDataLoader import PartNormalDataset
 import torch.nn.functional as F
 from pathlib import Path
-from utils import test_partseg, select_avaliable, mkdir, auto_complete
 import my_log as log
 from tqdm import tqdm
+
+from utils import test_partseg, select_avaliable, mkdir
+from data_utils.ShapeNetDataLoader import PartNormalDataset, label_id_to_name
 from model.pointnet2 import PointNet2PartSegMsg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss
 
-seg_classes = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43], 'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 'Cap': [6, 7], 'Skateboard': [44, 45, 46], 'Mug': [36, 37], 'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27], 'Table': [47, 48, 49], 'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40], 'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
-seg_label_to_cat = {} # {0:Airplane, 1:Airplane, ...49:Table}
-for cat in seg_classes.keys():
-    for label in seg_classes[cat]:
-        seg_label_to_cat[label] = cat
-
-def parse_args():
+def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet2')
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
-    parser.add_argument('--batch_size', type=int, default=0, help='input batch size')
-    parser.add_argument('--workers', type=int, default=0, help='number of data loading workers')
-    parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
+    parser.add_argument('--batch_size', type=int, default=16, help='input batch size')
+    parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
+    parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return auto_complete(parser.parse_args(),'partseg')
+    if notebook:
+        return parser.parse_args([])
+    else:
+        return parser.parse_args()
+
+root = select_avaliable([
+    '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
+    '/media/james/Ubuntu_Data/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
+    '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
+    '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
+    '/media/james/HDD/James_Least/Datasets/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
+])
 
 def _load(root):
     fn_cache = 'experiment/shapenetcore_partanno_segmentation_benchmark_v0_normal.h5'
@@ -72,14 +78,6 @@ def _load(root):
         cache[token] = fp_h5.get(token)[()]
     return cache
 
-root = select_avaliable([
-    '/media/james/HDD/James_Least/Large_Dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
-    '/media/james/Ubuntu_Data/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
-    '/media/james/MyPassport/James/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
-    '/home/james/dataset/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/',
-    '/media/james/HDD/James_Least/Datasets/ShapeNet/shapenetcore_partanno_segmentation_benchmark_v0_normal/'
-])
-
 def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/partseg/%s/'%(args.model_name))
@@ -103,6 +101,10 @@ def train(args):
     else:
         model = PointNet2PartSegMsg_one_hot(num_part)
 
+    torch.backends.cudnn.benchmark = True
+    model = torch.nn.DataParallel(model).cuda()
+    log.debug('Using gpu:',args.gpu)
+
     if args.pretrain is not None and args.pretrain != 'None':
         log.debug('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
@@ -123,16 +125,6 @@ def train(args):
             weight_decay=args.decay_rate)
             
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
-
-    device_ids = [int(x) for x in args.gpu.split(',')]
-    if len(device_ids) >= 2:
-        torch.backends.cudnn.benchmark = True
-        model.cuda(device_ids[0])
-        model = torch.nn.DataParallel(model, device_ids=device_ids)
-        log.debug('Using multi GPU:',device_ids)
-    else:
-        model.cuda()
-        log.debug('Using single GPU:',device_ids)
 
     history = defaultdict(lambda: list())
     best_acc = 0
@@ -194,8 +186,13 @@ def train(args):
         log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
-        forpointnet2 = args.model_name == 'pointnet2'
-        test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat,50,forpointnet2)
+        test_metrics, test_hist_acc, cat_mean_iou = test_partseg(
+            model.eval(), 
+            testdataloader, 
+            label_id_to_name, 
+            args.model_name,
+            num_part, 
+        )
         
         save_model = False
         if test_metrics['accuracy'] > best_acc:
@@ -237,18 +234,27 @@ def evaluate(args):
     else:
         model = PointNetDenseCls(cat_num=num_classes,part_num=num_part)
 
+    torch.backends.cudnn.benchmark = True
+    model = torch.nn.DataParallel(model).cuda()
+    log.debug('Using gpu:',args.gpu)
+
     if args.pretrain is None:
         log.err('No pretrain model')
         return
 
-    log.info('Loading pretrain model...')
-    checkpoint = torch.load(args.pretrain)
-    model.load_state_dict(checkpoint)
-    model.cuda()
+    log.debug('Loading pretrain model...')
+    state_dict = torch.load(args.pretrain)
+    model.load_state_dict(state_dict)
 
     log.info('Testing pretrain model...')
-    forpointnet2 = args.model_name == 'pointnet2'
-    test_metrics, test_hist_acc, cat_mean_iou = test_partseg(model.eval(), testdataloader, seg_label_to_cat, num_part, forpointnet2)
+    
+    test_metrics, test_hist_acc, cat_mean_iou = test_partseg(
+        model.eval(), 
+        testdataloader, 
+        label_id_to_name, 
+        args.model_name,
+        num_part, 
+    )
 
     log.info('test_hist_acc',len(test_hist_acc))
     log.info(cat_mean_iou)
@@ -271,6 +277,11 @@ def vis(args):
     else:
         model = PointNet2PartSegMsg_one_hot(num_part) 
 
+    torch.backends.cudnn.benchmark = True
+    model = torch.nn.DataParallel(model)
+    model.cuda()
+    log.debug('Using multi GPU:',args.gpu)
+
     if args.pretrain is None:
         log.err('No pretrain model')
         return
@@ -278,7 +289,7 @@ def vis(args):
     log.info('Loading pretrain model...')
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
-    model.cuda()
+
     log.info('Press space to exit, press Q for next frame')
     for batch_id, (points, label, target, norm_plt) in enumerate(testdataloader):
         batchsize, num_point, _= points.size()

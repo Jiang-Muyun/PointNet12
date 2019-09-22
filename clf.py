@@ -11,29 +11,32 @@ import torch.nn.parallel
 import torch.utils.data
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-from data_utils.ModelNetDataLoader import ModelNetDataLoader, load_data, class_names
 from pathlib import Path
 from tqdm import tqdm
-from utils import test, save_checkpoint, select_avaliable, mkdir, auto_complete
 import my_log as log
+
+from data_utils.ModelNetDataLoader import ModelNetDataLoader, load_data, class_names
+from utils import test_clf, save_checkpoint, select_avaliable, mkdir
 from model.pointnet2 import PointNet2ClsMsg
 from model.pointnet import PointNetCls, feature_transform_reguliarzer
 
-def parse_args(manual = None):
+def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', default='pointnet', help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
-    parser.add_argument('--batch_size', type=int, default=0, help='batch size in training')
-    parser.add_argument('--epoch', default=200, type=int, help='number of epoch in training')
+    parser.add_argument('--batch_size', type=int, default=16, help='batch size in training')
+    parser.add_argument('--epoch', default=100, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
-    parser.add_argument('--train_metric', type=str, default=False, help='whether evaluate on training dataset')
     parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer for training')
     parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='decay rate of learning rate')
     parser.add_argument('--feature_transform', default=False, help="use feature transform in pointnet")
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
-    return auto_complete(parser.parse_args(manual),'clf')
+    if notebook:
+        return parser.parse_args([])
+    else:
+        return parser.parse_args()
 
 root = select_avaliable([
     '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
@@ -60,9 +63,14 @@ def train(args):
     else:
         model = PointNet2ClsMsg().cuda()
 
+    torch.backends.cudnn.benchmark = True
+    model = torch.nn.DataParallel(model).cuda()
+    log.debug('Using gpu:',args.gpu)
+
     if args.pretrain is not None:
         log.info('Use pretrain model...')
-        model.load_state_dict(torch.load(args.pretrain))
+        state_dict = torch.load(args.pretrain)
+        model.load_state_dict(state_dict)
         init_epoch = int(args.pretrain[:-4].split('-')[-1])
         log.info('start epoch from', init_epoch)
     else:
@@ -72,21 +80,16 @@ def train(args):
     if args.optimizer == 'SGD':
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     elif args.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(model.parameters(),lr=args.learning_rate,
-                                    betas=(0.9, 0.999),eps=1e-08,weight_decay=args.decay_rate)
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=args.learning_rate,
+            betas=(0.9, 0.999),
+            eps=1e-08,
+            weight_decay=args.decay_rate
+        )
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
     LEARNING_RATE_CLIP = 1e-5
-
-    device_ids = [int(x) for x in args.gpu.split(',')]
-    if len(device_ids) >= 2:
-        torch.backends.cudnn.benchmark = True
-        model.cuda(device_ids[0])
-        model = torch.nn.DataParallel(model, device_ids=device_ids)
-        log.info('Using multi GPU:',device_ids)
-    else:
-        model.cuda()
-        log.info('Using single GPU:',device_ids)
 
     global_epoch = 0
     global_step = 0
@@ -110,7 +113,6 @@ def train(args):
             optimizer.zero_grad()
             model = model.train()
             pred, trans_feat = model(points)
-            # log.info('points',points.shape,'pred',pred.shape)
             loss = F.nll_loss(pred, target.long())
             if args.feature_transform and args.model_name == 'pointnet':
                 loss += feature_transform_reguliarzer(trans_feat) * 0.001
@@ -121,11 +123,7 @@ def train(args):
         log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
-        if args.train_metric:
-            train_acc = test(model.eval(), trainDataLoader)
-            log.info('Train Accuracy', train_acc)
-
-        acc = test(model, testDataLoader)
+        acc = test_clf(model, testDataLoader)
         log.info(loss='%.5f' % (loss.data))
         log.info(Test_Accuracy='%.5f' % acc)
 
@@ -147,20 +145,24 @@ def evaluate(args):
     log.debug('Building Model',args.model_name)
     if args.model_name == 'pointnet':
         num_class = 40
-        model = PointNetCls(num_class,args.feature_transform).cuda()  
+        model = PointNetCls(num_class,args.feature_transform)
     else:
-        model = PointNet2ClsMsg().cuda()
+        model = PointNet2ClsMsg()
+
+    torch.backends.cudnn.benchmark = True
+    model = torch.nn.DataParallel(model).cuda()
+    log.debug('Using gpu:',args.gpu)
 
     if args.pretrain is None:
         log.err('No pretrain model')
         return
 
     log.debug('Loading pretrain model...')
-    checkpoint = torch.load(args.pretrain)
-    model.load_state_dict(checkpoint)
+    state_dict = torch.load(args.pretrain)
+    model.load_state_dict(state_dict)
 
-    acc = test(model.eval(), testDataLoader)
-    log.debug(Test_Accurac='%.5f' % (acc))
+    acc = test_clf(model.eval(), testDataLoader)
+    log.msg(Test_Accuracy='%.5f' % (acc))
 
 def vis(args):
     test_data, test_label = load_data(root, train = False)
@@ -172,6 +174,11 @@ def vis(args):
         model = PointNetCls(num_class,args.feature_transform).cuda()  
     else:
         model = PointNet2ClsMsg().cuda()
+
+    torch.backends.cudnn.benchmark = True
+    model = torch.nn.DataParallel(model)
+    model.cuda()
+    log.info('Using multi GPU:',args.gpu)
 
     if args.pretrain is None:
         log.err('No pretrain model')

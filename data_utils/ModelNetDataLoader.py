@@ -19,7 +19,7 @@ def load_h5(h5_filename):
     seg = []
     return (data, label, seg)
 
-def load_data(path,train=True,classification = True):
+def load_data(path, train=True, classification = True):
     if train:
         data_train0, label_train0, Seglabel_train0  = load_h5(path + 'ply_data_train0.h5')
         data_train1, label_train1, Seglabel_train1 = load_h5(path + 'ply_data_train1.h5')
@@ -49,10 +49,10 @@ def load_data(path,train=True,classification = True):
 
 
 class ModelNetDataLoader(Dataset):
-    def __init__(self, data, labels, augmentation = False):
+    def __init__(self, data, labels, data_augmentation = False):
         self.data = data
         self.labels = labels
-        self.augmentation = augmentation
+        self.data_augmentation = data_augmentation
 
     def __len__(self):
         return len(self.data)

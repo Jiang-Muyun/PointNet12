@@ -26,6 +26,26 @@ from model.pointnet2 import PointNet2SemSeg
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader,SemKITTIDataLoader_AllPoints, load_data
 from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, reduced_class_names, reduced_colors
 
+
+class Window_Manager():
+    def __init__(self):
+        self.param = open3d.io.read_pinhole_camera_parameters('visualizer/ego_view.json')
+        self.vis = open3d.visualization.VisualizerWithKeyCallback()
+        self.vis.create_window(width=800, height=800, left=100)
+        self.vis.register_key_callback(32, lambda vis: exit())
+        self.vis.get_render_option().load_from_json('visualizer/render_option.json')
+        self.pcd = open3d.geometry.PointCloud()
+    
+    def update(self, pts_3d, colors):
+        self.pcd.points = open3d.utility.Vector3dVector(pts_3d)
+        self.pcd.colors = open3d.utility.Vector3dVector(colors/255)
+        self.vis.remove_geometry(self.pcd)
+        self.vis.add_geometry(self.pcd)
+        self.vis.get_view_control().convert_from_pinhole_camera_parameters(self.param)
+        self.vis.update_geometry()
+        self.vis.poll_events()
+        self.vis.update_renderer()
+
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
@@ -89,7 +109,6 @@ def test_kitti_semseg(model, loader, catdict, model_name, num_classes):
     cat_iou = iou_tabel.groupby('Category_IOU')['mean_iou'].mean()
 
     return metrics, cat_iou
-
 
 def train(args):
     experiment_dir = mkdir('experiment/')
@@ -241,6 +260,10 @@ def evaluate(args):
 
 def vis(args):
     args = parse_args()
+    if args.model_name == 'pointnet':
+        args.pretrain = 'experiment/weights/kitti_semseg-pointnet-0.53106-0053.pth'
+    else:
+        args.pretrain = 'experiment/weights/kitti_semseg-pointnet2-0.59957-0023.pth'
     _,_,test_data, test_label = load_data(args.h5, train = False, selected = ['03'])
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
@@ -264,14 +287,9 @@ def vis(args):
     model.cuda()
     model.eval()
 
-    param = open3d.io.read_pinhole_camera_parameters('visualizer/ego_view.json')
-    vis = open3d.visualization.VisualizerWithKeyCallback()
-    vis.create_window(width=800, height=800, left=100)
-    vis.register_key_callback(32, lambda vis: exit())
-    vis.get_render_option().load_from_json('visualizer/render_option.json')
-    point_cloud = open3d.geometry.PointCloud()
+    handle = Window_Manager()
 
-    for i in range(len(test_data)):
+    for i in range(100, len(test_data)):
         points = torch.from_numpy(test_data[i]).unsqueeze(0)
         points = points.transpose(2, 1).cuda()
         points[:,0] = points[:,0] / 70
@@ -283,22 +301,11 @@ def vis(args):
                 pred, _ = model(points)
             else:
                 pred = model(points)
-            pred_choice = pred.data.max(-1)[1].cpu().numpy()
-        torch.cuda.empty_cache()
-        pcd = test_data[i][:,:3].copy()
-        choice = pred_choice[0]
-        colors = np.array(reduced_colors,dtype=np.uint8)[choice]
-        print(pcd.shape,choice.shape, colors.shape)
-        
-        point_cloud.points = open3d.utility.Vector3dVector(pcd)
-        point_cloud.colors = open3d.utility.Vector3dVector(colors/255)
+            pred_choice = pred.data.max(-1)[1].cpu().squeeze_(0).numpy()
 
-        vis.remove_geometry(point_cloud)
-        vis.add_geometry(point_cloud)
-        vis.get_view_control().convert_from_pinhole_camera_parameters(param)
-        vis.update_geometry()
-        vis.poll_events()
-        vis.update_renderer()
+        pts_3d = test_data[i][:,:3].copy()
+        handle.update(pts_3d, reduced_colors[pred_choice])
+        print(i, pred_choice.shape)
 
 if __name__ == '__main__':
     args = parse_args()

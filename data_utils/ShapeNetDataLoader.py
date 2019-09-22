@@ -11,6 +11,29 @@ warnings.filterwarnings('ignore')
 import sys
 from .augmentation import rotate_point_cloud, jitter_point_cloud, point_cloud_normalize
 
+seg_classes = {
+    'Earphone': [16, 17, 18], 
+    'Motorbike': [30, 31, 32, 33, 34, 35], 
+    'Rocket': [41, 42, 43], 
+    'Car': [8, 9, 10, 11], 
+    'Laptop': [28, 29], 
+    'Cap': [6, 7], 
+    'Skateboard': [44, 45, 46], 
+    'Mug': [36, 37], 
+    'Guitar': [19, 20, 21], 
+    'Bag': [4, 5], 
+    'Lamp': [24, 25, 26, 27], 
+    'Table': [47, 48, 49], 
+    'Airplane': [0, 1, 2, 3], 
+    'Pistol': [38, 39, 40], 
+    'Chair': [12, 13, 14, 15], 
+    'Knife': [22, 23]
+}
+label_id_to_name = {}
+for cat in seg_classes.keys():
+    for label in seg_classes[cat]:
+        label_id_to_name[label] = cat
+
 class PartNormalDataset(Dataset):
     def __init__(self, root, cache = {}, npoints=2500, split='train', normalize=True, data_augmentation=False):
         self.npoints = npoints
