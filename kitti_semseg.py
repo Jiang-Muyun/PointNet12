@@ -5,6 +5,7 @@ import time
 import h5py
 import datetime
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 import torch
 import torch.nn.parallel
@@ -22,7 +23,7 @@ from utils import test_semseg, select_avaliable, mkdir, auto_complete
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
-from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
+from data_utils.SemKITTIDataLoader import SemKITTIDataLoader,SemKITTIDataLoader_AllPoints, load_data
 from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, reduced_class_names, reduced_colors
 
 def parse_args(notebook = False):
@@ -43,6 +44,52 @@ def parse_args(notebook = False):
         return parser.parse_args([])
     else:
         return parser.parse_args()
+
+def calc_categorical_iou(pred, target, num_classes ,iou_tabel):
+    choice = pred.max(-1)[1]
+    target.squeeze_(-1)
+    for cat in range(num_classes):
+        I = torch.sum((choice == cat) & (target == cat)).float()
+        U = torch.sum((choice == cat) | (target == cat)).float()
+        if U == 0:
+            iou = 1
+        else:
+            iou = (I / U).cpu().item()
+        iou_tabel[cat,0] += iou
+        iou_tabel[cat,1] += 1
+    return iou_tabel
+
+def test_kitti_semseg(model, loader, catdict, model_name, num_classes):
+    iou_tabel = np.zeros((len(catdict),3))
+    metrics = {'accuracy':[]}
+    
+    for points, target in tqdm(loader, total=len(loader), smoothing=0.9):
+        batchsize, num_point, _ = points.size()
+        points, target = Variable(points.float()), Variable(target.long())
+        points = points.transpose(2, 1)
+        points, target = points.cuda(), target.cuda()
+        with torch.no_grad():
+            if model_name == 'pointnet':
+                pred, _ = model(points)
+            else:
+                pred = model(points)
+
+        iou_tabel = calc_categorical_iou(pred,target,num_classes,iou_tabel)
+        
+        target.squeeze_(-1)
+        pred_choice = pred.data.max(-1)[1]
+        correct = (pred_choice == target.data).sum().cpu().item()
+        metrics['accuracy'].append(correct/ (batchsize * num_point))
+
+    iou_tabel[:,2] = iou_tabel[:,0] /iou_tabel[:,1]
+    metrics['accuracy'] = np.mean(metrics['accuracy'])
+    metrics['iou'] = np.mean(iou_tabel[:, 2])
+
+    iou_tabel = pd.DataFrame(iou_tabel,columns=['iou','count','mean_iou'])
+    iou_tabel['Category_IOU'] = [catdict[i] for i in range(len(catdict)) ]
+    cat_iou = iou_tabel.groupby('Category_IOU')['mean_iou'].mean()
+
+    return metrics, cat_iou
 
 
 def train(args):
@@ -129,7 +176,7 @@ def train(args):
         log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
-        test_metrics, cat_mean_iou = test_semseg(
+        test_metrics, cat_mean_iou = test_kitti_semseg(
             model.eval(), 
             testdataloader,
             label_id_to_name,
@@ -160,14 +207,15 @@ def train(args):
 
 def evaluate(args):
     _,_,test_data, test_label = load_data(args.h5, train = False)
-    test_dataset = SemKITTIDataLoader(test_data, test_label)
+
+    test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
-    
+
     log.debug('Building Model', args.model_name)
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
     else:
-        model = PointNet2SemSeg(num_classes)
+        model = PointNet2SemSeg(num_classes, feature_dims = 1)
 
     device_ids = [int(x) for x in args.gpu.split(',')]
     torch.backends.cudnn.benchmark = True
@@ -184,21 +232,17 @@ def evaluate(args):
     model.load_state_dict(checkpoint)
     model.cuda()
 
-    test_metrics, cat_mean_iou = test_semseg(
+    test_metrics, cat_mean_iou = test_kitti_semseg(
         model.eval(), 
-        testdataloader, 
+        testdataloader,
         label_id_to_name,
         args.model_name,
         num_classes = num_classes,
     )
+    
     mean_iou = np.mean(cat_mean_iou)
-    log.info(Test_accuracy=test_metrics['accuracy'], Test_meanIOU=mean_iou)
-    log.warn(mean_iou)
     log.warn(cat_mean_iou)
-
-from visualizer.kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
-
-# vis_handle = PointCloud_Vis(args.cfg, new_config = args.modify)
+    log.info('Curr', accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
 
 def vis(args):
     args = parse_args()
@@ -213,7 +257,7 @@ def vis(args):
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
     else:
-        model = PointNet2SemSeg(num_classes)
+        model = PointNet2SemSeg(num_classes, feature_dims = 1)
 
     device_ids = [int(x) for x in args.gpu.split(',')]
     torch.backends.cudnn.benchmark = True
@@ -268,7 +312,7 @@ def vis(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.mode == "train":
         train(args)
     if args.mode == "eval":

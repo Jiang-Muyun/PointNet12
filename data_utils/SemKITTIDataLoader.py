@@ -178,6 +178,27 @@ class SemKITTIDataLoader(Dataset):
         return pcd, label
 
 
+class SemKITTIDataLoader_AllPoints(Dataset):
+    def __init__(self, data, labels):
+        self.data = data
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        pcd = self.data[index]
+        label = self.labels[index]
+
+        if self.normalize:
+            pcd[:,0] = pcd[:,0] / 70
+            pcd[:,1] = pcd[:,1] / 70
+            pcd[:,2] = pcd[:,2] / 3
+            pcd[:,3] = (pcd[:,3] - 0.5)/2
+            pcd = np.clip(pcd,-1,1)
+            
+        return pcd, label
+
 def print_distro(labels):
     count = [0] * num_classes
     total = 0
