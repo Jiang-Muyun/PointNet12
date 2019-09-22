@@ -24,7 +24,7 @@ def fmt(fn_color, *args, **kwargs):
             msg = kwargs[k]
             if isinstance(msg,float):
                 msg = '%.5f' % msg
-            tmp += '%s: %s ' % (cyan(k), fn_color(msg))
+            tmp += '%s: %s ' % (k, fn_color(msg))
     tmp += end
     return tmp
 
@@ -35,7 +35,10 @@ def debug(*args, **kwargs):
     print_base(gray, *args, **kwargs)
 
 def info(*args, **kwargs):
-    print_base(blue, *args, **kwargs)
+    print_base(green, *args, **kwargs)
+
+def msg(*args, **kwargs):
+    print_base(yellow, *args, **kwargs)
 
 def warn(*args, **kwargs):
     print_base(magenta, *args, **kwargs)

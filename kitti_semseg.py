@@ -32,12 +32,11 @@ def parse_args(notebook = False):
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
     parser.add_argument('--workers', type=int, default=6, help='number of data loading workers')
-    parser.add_argument('--epoch', type=int, default=200, help='number of epochs for training')
-    parser.add_argument('--pretrain', type=str, default = None, help='whether use pretrain model')
+    parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
+    parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
     parser.add_argument('--h5', type=str, default = 'experiment/pts_sem_voxel_0.10.h5', help='pts h5 file')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
-    parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     if notebook:
@@ -100,7 +99,7 @@ def train(args):
     dataset = SemKITTIDataLoader(train_data, train_label, npoints = 5000, data_augmentation = args.augment)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = SemKITTIDataLoader(test_data, test_label)
+    test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
     
     if args.model_name == 'pointnet':
@@ -116,24 +115,20 @@ def train(args):
             lr=args.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-08,
-            weight_decay=args.decay_rate)
-            
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
-    LEARNING_RATE_CLIP = 1e-5
+            weight_decay=1e-4)
 
-    device_ids = [int(x) for x in args.gpu.split(',')]
     torch.backends.cudnn.benchmark = True
-    model.cuda(device_ids[0])
-    model = torch.nn.DataParallel(model, device_ids=device_ids)
-    log.debug('Using DataParallel:',device_ids)
+    model = torch.nn.DataParallel(model)
+    model.cuda()
+    log.debug('Using gpu:',args.gpu)
     
     if args.pretrain is not None:
         log.debug('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
         init_epoch = int(args.pretrain[:-4].split('-')[-1])
-        log.debug('start epoch from', init_epoch)
+        log.info('Restart training', epoch=init_epoch)
     else:
-        log.debug('Training from scratch')
+        log.msg('Training from scratch')
         init_epoch = 0
 
     history = defaultdict(lambda: list())
@@ -141,13 +136,10 @@ def train(args):
     best_meaniou = 0
 
     for epoch in range(init_epoch,args.epoch):
-        scheduler.step()
-        lr = max(optimizer.param_groups[0]['lr'],LEARNING_RATE_CLIP)
-
-        log.info(job='semseg',model=args.model_name,gpu=args.gpu,epoch='%d/%s' % (epoch, args.epoch),lr=lr)
+        log.info(job='kitti_semseg',model=args.model_name,gpu=args.gpu, epoch=epoch, lr=args.learning_rate)
         
         for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
+            param_group['lr'] = args.learning_rate
         
         for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader), smoothing=0.9):
             points, target = data
@@ -197,15 +189,20 @@ def train(args):
             fn_pth = 'kitti_semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            log.warn(cat_mean_iou)
+            log.msg(cat_mean_iou)
         else:
             log.info('No need to save model')
-            log.warn(cat_mean_iou)
+            log.msg(cat_mean_iou)
 
         log.warn('Curr',accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
         log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)
 
 def evaluate(args):
+    if args.model_name == 'pointnet':
+        args.pretrain = 'experiment/weights/kitti_semseg-pointnet-0.53106-0053.pth'
+    else:
+        args.pretrain = 'experiment/weights/kitti_semseg-pointnet2-0.59957-0023.pth'
+
     _,_,test_data, test_label = load_data(args.h5, train = False)
 
     test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
@@ -217,12 +214,10 @@ def evaluate(args):
     else:
         model = PointNet2SemSeg(num_classes, feature_dims = 1)
 
-    device_ids = [int(x) for x in args.gpu.split(',')]
     torch.backends.cudnn.benchmark = True
-    model.cuda(device_ids[0])
-    model = torch.nn.DataParallel(model, device_ids=device_ids)
-    log.debug('Using DataParallel:',device_ids)
-    
+    model = torch.nn.DataParallel(model)
+    log.debug('Using gpu:',args.gpu)
+
     if args.pretrain is None:
         log.err('No pretrain model')
         return
@@ -246,9 +241,6 @@ def evaluate(args):
 
 def vis(args):
     args = parse_args()
-    args.model_name = 'pointnet2'
-    args.pretrain = 'experiment/kitti_semseg/pointnet2/kitti_semseg-pointnet2-0.59957-0023.pth'
-    # args.pretrain = 'experiment/kitti_semseg/pointnet/kitti_semseg-pointnet-0.53106-0053.pth'
     _,_,test_data, test_label = load_data(args.h5, train = False, selected = ['03'])
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
@@ -259,11 +251,9 @@ def vis(args):
     else:
         model = PointNet2SemSeg(num_classes, feature_dims = 1)
 
-    device_ids = [int(x) for x in args.gpu.split(',')]
     torch.backends.cudnn.benchmark = True
-    model.cuda(device_ids[0])
-    model = torch.nn.DataParallel(model, device_ids=device_ids)
-    log.debug('Using DataParallel:',device_ids)
+    model = torch.nn.DataParallel(model)
+    log.debug('Using gpu:',args.gpu)
 
     if args.pretrain is None:
         log.err('No pretrain model')
@@ -312,7 +302,7 @@ def vis(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.mode == "train":
         train(args)
     if args.mode == "eval":
