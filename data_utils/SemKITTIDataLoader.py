@@ -1,6 +1,7 @@
 import os
 import json
 import numpy as np
+import random
 from tqdm import tqdm
 import h5py
 from torch.utils.data import Dataset
@@ -128,7 +129,7 @@ def load_data(root, train = False, selected = None):
     for part in selected:
         length = part_length[part]
 
-        for index in tqdm(range(length), desc=' > Loading %s: %s'%(part, length)):
+        for index in tqdm(range(length), desc=' > Loading %s: %s'%(part, length), dynamic_ncols=True):
             key = '%s/%06d'%(part, index)
 
             if index < length * 0.4:
@@ -169,13 +170,25 @@ class SemKITTIDataLoader(Dataset):
 
         if self.data_augmentation:
             pcd = np.expand_dims(pcd,axis=0)
-            # pcd = rotate_point_cloud(pcd)
             pcd = jitter_point_cloud(pcd).astype(np.float32)
             pcd = np.squeeze(pcd, axis=0)
         
-        choice = np.random.choice(pcd.shape[0], self.npoints, replace=True)
-        pcd = pcd[choice]
-        label = label[choice]
+        # choice = np.random.choice(pcd.shape[0], self.npoints, replace=True)
+        # pcd = pcd[choice]
+        # label = label[choice]
+
+        length = pcd.shape[0]
+        if length == self.npoints:
+            pass
+        elif length > self.npoints:
+            start_idx = np.random.randint(0, length - self.npoints)
+            end_idx = start_idx + self.npoints
+            pcd = pcd[start_idx:end_idx]
+            label = label[start_idx:end_idx]
+        else:
+            rows_short = self.npoints - length
+            pcd = np.concatenate((pcd,pcd[0:rows_short]),axis=0)
+            label = np.concatenate((label,label[0:rows_short]),axis=0)
         return pcd, label
 
 def print_distro(labels):

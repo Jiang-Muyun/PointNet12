@@ -64,6 +64,9 @@ def parse_args(notebook = False):
     else:
         return parser.parse_args()
 
+def calc_decay(init_lr, epoch):
+    return init_lr * 1/(1 + 0.03*epoch)
+
 def calc_categorical_iou(pred, target, num_classes ,iou_tabel):
     choice = pred.max(-1)[1]
     target.squeeze_(-1)
@@ -82,7 +85,7 @@ def test_kitti_semseg(model, loader, catdict, model_name, num_classes):
     iou_tabel = np.zeros((len(catdict),3))
     metrics = {'accuracy':[]}
     
-    for points, target in tqdm(loader, total=len(loader), smoothing=0.9):
+    for points, target in tqdm(loader, total=len(loader), smoothing=0.9, dynamic_ncols=True):
         batchsize, num_point, _ = points.size()
         points, target = Variable(points.float()), Variable(target.long())
         points = points.transpose(2, 1)
@@ -155,12 +158,13 @@ def train(args):
     best_meaniou = 0
 
     for epoch in range(init_epoch,args.epoch):
-        log.info(job='kitti_semseg',model=args.model_name,gpu=args.gpu, epoch=epoch, lr=args.learning_rate)
+        lr = calc_decay(args.learning_rate, epoch)
+        log.info(job='kitti_semseg',model=args.model_name,gpu=args.gpu, epoch=epoch, lr=lr)
         
         for param_group in optimizer.param_groups:
-            param_group['lr'] = args.learning_rate
+            param_group['lr'] = lr
         
-        for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader), smoothing=0.9):
+        for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
             points, target = data
             points, target = Variable(points.float()), Variable(target.long())
             points = points.transpose(2, 1)
@@ -262,9 +266,9 @@ from visualizer.kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
 
 def vis(args):
     part = '03'
-    kitti_root = ''
+    kitti_root = '/media/james/Ubuntu_Data/dataset/KITTI/odometry/dataset/'
     cfg_data = json.load(open('visualizer/ego_view.json'))
-    handle = Semantic_KITTI_Utils(root = )
+    handle = Semantic_KITTI_Utils(root = kitti_root)
     handle.set_filter(cfg_data['h_fov'], cfg_data['v_fov'])
     handle.set_part(part)
 
