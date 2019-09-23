@@ -8,20 +8,17 @@ import datetime
 import cv2
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 import torch
 import torch.nn.parallel
 import torch.utils.data
 from torch.utils.data import DataLoader
-from utils import to_categorical
-from collections import defaultdict
+from matplotlib import pyplot as plt
 from torch.autograd import Variable
 import torch.nn.functional as F
 from pathlib import Path
 import my_log as log
 from tqdm import tqdm
 
-from utils import test_semseg, select_avaliable, mkdir
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
@@ -49,6 +46,21 @@ class Window_Manager():
 
     def capture_screen(self,fn):
         self.vis.capture_screen_image(fn, False)
+
+def mkdir(fn):
+    os.makedirs(fn, exist_ok=True)
+    return fn
+
+def select_avaliable(fn_list):
+    selected = None
+    for fn in fn_list:
+        if os.path.exists(fn):
+            selected = fn
+            break
+    if selected is None:
+        log.err(log.yellow("Could not find dataset from"), fn_list)
+    else:
+        return selected
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
@@ -91,7 +103,7 @@ def test_kitti_semseg(model, loader, catdict, model_name, num_classes):
     
     for points, target in tqdm(loader, total=len(loader), smoothing=0.9, dynamic_ncols=True):
         batchsize, num_point, _ = points.size()
-        points, target = Variable(points.float()), Variable(target.long())
+        # points, target = Variable(points.float()), Variable(target.long())
         points = points.transpose(2, 1)
         points, target = points.cuda(), target.cuda()
         with torch.no_grad():
@@ -157,7 +169,7 @@ def train(args):
         log.msg('Training from scratch')
         init_epoch = 0
 
-    history = defaultdict(lambda: list())
+    history = {'loss':[]}
     best_acc = 0
     best_meaniou = 0
 
@@ -170,7 +182,7 @@ def train(args):
         
         for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
             points, target = data
-            points, target = Variable(points.float()), Variable(target.long())
+            # points, target = Variable(points.float()), Variable(target.long())
             points = points.transpose(2, 1)
             points, target = points.cuda(), target.cuda()
             optimizer.zero_grad()
