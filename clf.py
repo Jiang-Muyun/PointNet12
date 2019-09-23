@@ -7,11 +7,9 @@ import datetime
 import numpy as np
 from matplotlib import pyplot as plt
 import torch
-import torch.nn.parallel
-import torch.utils.data
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-from pathlib import Path
+
 from tqdm import tqdm
 import my_log as log
 
@@ -38,17 +36,10 @@ def parse_args(notebook = False):
     else:
         return parser.parse_args()
 
-root = select_avaliable([
-    '/media/james/Ubuntu_Data/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-    '/media/james/MyPassport/James/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-    '/home/james/dataset/ShapeNet/modelnet40_ply_hdf5_2048/',
-    '/media/james/HDD/James_Least/Datasets/ShapeNet/modelnet40_ply_hdf5_2048/'
-])
-
 def train(args):
     experiment_dir = mkdir('./experiment/')
     checkpoints_dir = mkdir('./experiment/clf/%s/'%(args.model_name))
-    train_data, train_label, test_data, test_label = load_data(root)
+    train_data, train_label, test_data, test_label = load_data('experiment/data/modelnet40_ply_hdf5_2048/')
 
     trainDataset = ModelNetDataLoader(train_data, train_label, data_augmentation = args.augment)
     trainDataLoader = DataLoader(trainDataset, batch_size=args.batch_size, shuffle=True)
@@ -138,7 +129,7 @@ def train(args):
     log.info('End of training...')
 
 def evaluate(args):
-    test_data, test_label = load_data(root, train = False)
+    test_data, test_label = load_data('experiment/data/modelnet40_ply_hdf5_2048/', train = False)
     testDataset = ModelNetDataLoader(test_data, test_label)
     testDataLoader = torch.utils.data.DataLoader(testDataset, batch_size=args.batch_size, shuffle=False)
 

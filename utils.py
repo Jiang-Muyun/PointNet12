@@ -137,7 +137,7 @@ def test_partseg(model, loader, catdict, model_name, num_classes = 50):
     hist_acc = []
     # mean_correct = []
     
-    for batch_id, (points, label, target, norm_plt) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
+    for points, label, target, norm_plt in tqdm(loader, total=len(loader), smoothing=0.9, dynamic_ncols=True):
         batchsize, num_point,_= points.size()
         points, label, target, norm_plt = Variable(points.float()),Variable(label.long()), Variable(target.long()),Variable(norm_plt.float())
         points = points.transpose(2, 1)
@@ -179,7 +179,7 @@ def test_semseg(model, loader, catdict, model_name, num_classes):
     metrics = defaultdict(lambda:list())
     
     with torch.no_grad():
-        for batch_id, (points, target) in tqdm(enumerate(loader), total=len(loader), smoothing=0.9):
+        for points, target in tqdm(loader, total=len(loader), smoothing=0.9, dynamic_ncols=True):
             batchsize, num_point, _ = points.size()
             points, target = Variable(points.float()), Variable(target.long())
             points = points.transpose(2, 1)

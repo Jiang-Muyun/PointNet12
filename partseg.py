@@ -7,18 +7,13 @@ import datetime
 import numpy as np
 from matplotlib import pyplot as plt
 import torch
-import torch.nn.parallel
-import torch.utils.data
 from torch.utils.data import DataLoader
-from utils import to_categorical
-from collections import defaultdict
-from torch.autograd import Variable
 import torch.nn.functional as F
-from pathlib import Path
+
 import my_log as log
 from tqdm import tqdm
 
-from utils import test_partseg, select_avaliable, mkdir
+from utils import test_partseg, select_avaliable, mkdir, to_categorical
 from data_utils.ShapeNetDataLoader import PartNormalDataset, label_id_to_name
 from model.pointnet2 import PointNet2PartSegMsg_one_hot
 from model.pointnet import PointNetDenseCls,PointNetLoss
@@ -50,7 +45,7 @@ root = select_avaliable([
 ])
 
 def _load(root):
-    fn_cache = 'experiment/shapenetcore_partanno_segmentation_benchmark_v0_normal.h5'
+    fn_cache = 'experiment/data/shapenetcore_partanno_segmentation_benchmark_v0_normal.h5'
     if not os.path.exists(fn_cache):
         log.debug('Indexing Files...')
         fns_full = []
@@ -126,7 +121,7 @@ def train(args):
             
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
-    history = defaultdict(lambda: list())
+    history = {'loss':[]}
     best_acc = 0
     best_class_avg_iou = 0
     best_inctance_avg_iou = 0
@@ -160,7 +155,7 @@ def train(args):
 
         for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader),smoothing=0.9):
             points, label, target, norm_plt = data
-            points, label, target = Variable(points.float()),Variable(label.long()),  Variable(target.long())
+            points, label, target = points.float(), label.long(), target.long()
             points = points.transpose(2, 1)
             norm_plt = norm_plt.transpose(2, 1)
             points, label, target,norm_plt = points.cuda(),label.squeeze().cuda(), target.cuda(), norm_plt.cuda()
@@ -293,7 +288,7 @@ def vis(args):
     log.info('Press space to exit, press Q for next frame')
     for batch_id, (points, label, target, norm_plt) in enumerate(testdataloader):
         batchsize, num_point, _= points.size()
-        points, label, target, norm_plt = Variable(points.float()),Variable(label.long()), Variable(target.long()),Variable(norm_plt.float())
+        points, label, target, norm_plt = points.float(),label.long(), target.long(),norm_plt.float()
         points = points.transpose(2, 1)
         norm_plt = norm_plt.transpose(2, 1)
         points, label, target, norm_plt = points.cuda(), label.squeeze().cuda(), target.cuda(), norm_plt.cuda()

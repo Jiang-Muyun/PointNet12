@@ -38,8 +38,7 @@ def chamfer_batch(p1, p2):
     '''
     assert p1.size(0) == p2.size(0) and p1.size(2) == p2.size(2)
 
-    p1 = p1.unsqueeze(1)
-    p2 = p2.unsqueeze(1)
+    p1,p2 = p1.unsqueeze(1), p2.unsqueeze(1)
 
     p1 = p1.repeat(1, p2.size(2), 1, 1)
     p1 = p1.transpose(1, 2)

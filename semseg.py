@@ -1,19 +1,15 @@
 import open3d
 import argparse
 import os
-import torch
 import time
 import h5py
 import datetime
 import numpy as np
 from matplotlib import pyplot as plt
-import torch.nn.parallel
-import torch.utils.data
+import torch
 from torch.utils.data import DataLoader
-from collections import defaultdict
-from torch.autograd import Variable
 import torch.nn.functional as F
-from pathlib import Path
+
 import my_log as log
 from tqdm import tqdm
 
@@ -48,7 +44,7 @@ root = select_avaliable([
 ])
 
 def _load(load_train = True):
-    dataset_tmp = 'experiment/indoor3d_sem_seg_hdf5_data.h5'
+    dataset_tmp = 'experiment/data/indoor3d_sem_seg_hdf5_data.h5'
     if not os.path.exists(dataset_tmp):
         log.info('Loading data...')
         train_data, train_label, test_data, test_label = recognize_all_data(root, test_area = 5)
@@ -117,7 +113,7 @@ def train(args):
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
     LEARNING_RATE_CLIP = 1e-5
 
-    history = defaultdict(lambda: list())
+    history = {'loss':[]}
     best_acc = 0
     best_meaniou = 0
 
@@ -130,9 +126,8 @@ def train(args):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
-        for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader),smoothing=0.9):
-            points, target = data
-            points, target = Variable(points.float()), Variable(target.long())
+        for points, target in tqdm(dataloader, total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
+            points, target = points.float(), target.long()
             points = points.transpose(2, 1)
             points, target = points.cuda(), target.cuda()
             optimizer.zero_grad()
