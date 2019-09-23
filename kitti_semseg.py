@@ -19,45 +19,9 @@ import my_log as log
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
+from utils import mkdir, select_avaliable
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
 from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, reduced_class_names, reduced_colors
-
-class Window_Manager():
-    def __init__(self):
-        self.param = open3d.io.read_pinhole_camera_parameters('config/ego_view.json')
-        self.vis = open3d.visualization.VisualizerWithKeyCallback()
-        self.vis.create_window(width=800, height=800, left=100)
-        self.vis.register_key_callback(32, lambda vis: exit())
-        self.vis.get_render_option().load_from_json('config/render_option.json')
-        self.pcd = open3d.geometry.PointCloud()
-    
-    def update(self, pts_3d, colors):
-        self.pcd.points = open3d.utility.Vector3dVector(pts_3d)
-        self.pcd.colors = open3d.utility.Vector3dVector(colors/255)
-        self.vis.remove_geometry(self.pcd)
-        self.vis.add_geometry(self.pcd)
-        self.vis.get_view_control().convert_from_pinhole_camera_parameters(self.param)
-        self.vis.update_geometry()
-        self.vis.poll_events()
-        self.vis.update_renderer()
-
-    def capture_screen(self,fn):
-        self.vis.capture_screen_image(fn, False)
-
-def mkdir(fn):
-    os.makedirs(fn, exist_ok=True)
-    return fn
-
-def select_avaliable(fn_list):
-    selected = None
-    for fn in fn_list:
-        if os.path.exists(fn):
-            selected = fn
-            break
-    if selected is None:
-        log.err(log.yellow("Could not find dataset from"), fn_list)
-    else:
-        return selected
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
@@ -275,83 +239,6 @@ def evaluate(args):
     log.warn(cat_mean_iou)
     log.info('Curr', accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
 
-from kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
-
-def vis(args):
-    part = '03'
-    KITTI_ROOT = '/media/james/Ubuntu_Data/dataset/KITTI/odometry/dataset/'
-    cfg_data = json.load(open('config/ego_view.json'))
-    handle = Semantic_KITTI_Utils(root = KITTI_ROOT)
-    handle.set_filter(cfg_data['h_fov'], cfg_data['v_fov'])
-    handle.set_part(part)
-    vis_handle = Window_Manager()
-
-    args = parse_args()
-    if args.model_name == 'pointnet':
-        args.pretrain = 'experiment/weights/kitti_semseg-pointnet-0.53106-0053.pth'
-    else:
-        args.pretrain = 'experiment/weights/kitti_semseg-pointnet2-0.59957-0023.pth'
-    _,_,test_data, test_label = load_data(args.h5, train = False, selected = [part])
-    test_dataset = SemKITTIDataLoader(test_data, test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
-
-    log.debug('Building Model', args.model_name)
-    if args.model_name == 'pointnet':
-        model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
-    else:
-        model = PointNet2SemSeg(num_classes, feature_dims = 1)
-
-    torch.backends.cudnn.benchmark = True
-    model = torch.nn.DataParallel(model)
-    log.debug('Using gpu:',args.gpu)
-
-    if args.pretrain is None:
-        log.err('No pretrain model')
-
-    log.debug('Loading pretrain model...')
-    checkpoint = torch.load(args.pretrain)
-    model.load_state_dict(checkpoint)
-    model.cuda()
-    model.eval()
-
-    for i in range(100, len(test_data)):
-        points = torch.from_numpy(test_data[i]).unsqueeze(0)
-        points = points.transpose(2, 1).cuda()
-        points[:,0] = points[:,0] / 70
-        points[:,1] = points[:,1] / 70
-        points[:,2] = points[:,2] / 3
-        points[:,3] = (points[:,3] - 0.5)/2
-        with torch.no_grad():
-            if args.model_name == 'pointnet':
-                pred, _ = model(points)
-            else:
-                pred = model(points)
-            pred_choice = pred.data.max(-1)[1].cpu().squeeze_(0).numpy()
-            sem_label = pred_choice
-
-        pts_3d = test_data[i][:,:3].copy()
-        colors = reduced_colors[pred_choice]
-        vis_handle.update(pts_3d, colors)
-        mkdir('experiment/imgs/%s/'%(args.model_name))
-        vis_handle.capture_screen('experiment/imgs/%s/%d_3d.png'%(args.model_name,i))
-
-        handle.load(i)
-        pts_2d, color = handle.project_3d_to_2d(test_data[i][:,:3])
-
-        img_semantic = handle.frame.copy()
-        pts = pts_2d.astype(np.int32).tolist()
-
-        for (x,y),c in zip(pts, colors.tolist()):
-            cv2.circle(img_semantic, (x, y), 2, [c[2],c[1],c[0]], -1)
-
-        cv2.imshow('semantic', img_semantic)
-        cv2.imwrite('experiment/imgs/%s/%d_sem.png'%(args.model_name, i), img_semantic)
-
-        print(i, pred_choice.shape)
-
-        if 32 == cv2.waitKey(1):
-            break
-
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -359,5 +246,3 @@ if __name__ == '__main__':
         train(args)
     if args.mode == "eval":
         evaluate(args)
-    if args.mode == "vis":
-        vis(args)

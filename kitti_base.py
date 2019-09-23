@@ -281,48 +281,34 @@ class Semantic_KITTI_Utils():
 
     def project_3d_to_2d(self, pts_3d):
         assert pts_3d.shape[1] == 3, pts_3d.shape
-
+        pts_3d = pts_3d.copy()
+        
         # Create a [N,1] array
-        one_mat = np.ones((pts_3d.shape[0], 1),dtype=np.float64)
+        one_mat = np.ones((pts_3d.shape[0], 1),dtype=np.float32)
 
         # Concat and change shape from [N,3] to [N,4] to [4,N]
         xyz_v = np.concatenate((pts_3d, one_mat), axis=1).T
-
-        assert xyz_v.shape[0] == 4, xyz_v.shape
 
         # convert velodyne coordinates(X_v, Y_v, Z_v) to camera coordinates(X_c, Y_c, Z_c)
         for i in range(xyz_v.shape[1]):
             xyz_v[:3, i] = np.matmul(self.RT_, xyz_v[:, i])
 
-        """
-        xyz_c - 3D velodyne points corresponding to h, v FOV in the camera coordinates
-                   [x_1 , x_2 , .. ]
-        xyz_c   =  [y_1 , y_2 , .. ]
-                   [z_1 , z_2 , .. ]
-        """
-        xyz_c = np.delete(xyz_v, 3, axis=0)
+        xyz_c = xyz_v[:3]
 
         # convert camera coordinates(X_c, Y_c, Z_c) image(pixel) coordinates(x,y)
         for i in range(xyz_c.shape[1]):
             xyz_c[:, i] = np.matmul(self.P_, xyz_c[:, i])
 
-        """
-        xy_i   - 3D velodyne points corresponding to h, v FOV in the image(pixel) coordinates before scale adjustment
-        pts_2d - 3D velodyne points corresponding to h, v FOV in the image(pixel) coordinates
-                    [s_1*x_1 , s_2*x_2 , .. ]
-        xy_i    =   [s_1*y_1 , s_2*y_2 , .. ]     pts_2d =   [x_1 , x_2 , .. ]
-                    [  s_1   ,   s_2   , .. ]                [y_1 , y_2 , .. ]
-        """
-        xy_i = xyz_c[::] / xyz_c[::][2]
-        pts = np.delete(xy_i, 2, axis=0)
-        pts_2d = pts.T
-        assert pts_2d.shape[1] == 2
+        # normalize image(pixel) coordinates(x,y)
+        xy_i = xyz_c / xyz_c[2]
 
-        points = xyz_v[:3].T
-        x, y, z = points[:, 0], points[:, 1], points[:, 2]
-        d = np.sqrt(x ** 2 + y ** 2 + z ** 2)
-        d_normalize = (d - d.min()) / (d.max() - d.min())
-        color = [[int(x*255) for x in colorsys.hsv_to_rgb(hue,1,1)] for hue in d_normalize]
+        # get pixels location
+        pts_2d = xy_i[:2].T
+
+        x, y, z = pts_3d[:, 0], pts_3d[:, 1], pts_3d[:, 2]
+        dist = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+        dist_normalize = (dist - dist.min()) / (dist.max() - dist.min())
+        color = [[int(x*255) for x in colorsys.hsv_to_rgb(hue,1,1)] for hue in dist_normalize]
 
         return pts_2d, color
 
