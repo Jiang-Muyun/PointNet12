@@ -131,7 +131,7 @@ def train(args):
     checkpoints_dir = mkdir('experiment/kitti_semseg/%s/'%(args.model_name))
     train_data, train_label, test_data, test_label = load_data(args.h5, train = True)
 
-    dataset = SemKITTIDataLoader(train_data, train_label, npoints = 5000, data_augmentation = args.augment)
+    dataset = SemKITTIDataLoader(train_data, train_label, npoints = 7000, data_augmentation = args.augment)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
     test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
