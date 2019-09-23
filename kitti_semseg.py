@@ -270,15 +270,9 @@ from kitti_base import PointCloud_Vis, Semantic_KITTI_Utils
 
 def vis(args):
     part = '03'
-<<<<<<< HEAD
-    kitti_root = '/media/james/Ubuntu_Data/dataset/KITTI/odometry/dataset/'
-    cfg_data = json.load(open('visualizer/ego_view.json'))
-    handle = Semantic_KITTI_Utils(root = kitti_root)
-=======
     KITTI_ROOT = '/media/james/Ubuntu_Data/dataset/KITTI/odometry/dataset/'
     cfg_data = json.load(open('config/ego_view.json'))
     handle = Semantic_KITTI_Utils(root = KITTI_ROOT)
->>>>>>> e4986daec1569a5789b2460eefdbce6449f4890e
     handle.set_filter(cfg_data['h_fov'], cfg_data['v_fov'])
     handle.set_part(part)
     vis_handle = Window_Manager()
