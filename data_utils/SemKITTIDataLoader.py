@@ -5,9 +5,20 @@ import random
 from tqdm import tqdm
 import h5py
 from torch.utils.data import Dataset
-import sys
-sys.path.append('.')
-from data_utils.augmentation import rotate_point_cloud, jitter_point_cloud, point_cloud_normalize
+
+def jitter_point_cloud(batch_data, sigma=0.01, clip=0.05):
+    """ Randomly jitter points. jittering is per point.
+        Input:
+          BxNx3 array, original batch of point clouds
+        Return:
+          BxNx3 array, jittered batch of point clouds
+    """
+    assert len(batch_data.shape) == 3, batch_data.shape
+    B, N, C = batch_data.shape
+    assert(clip > 0)
+    jittered_data = np.clip(sigma * np.random.randn(B, N, C), -1*clip, clip)
+    jittered_data += batch_data
+    return jittered_data
 
 # kitti_class_names = [
 #     'unlabelled',    # 1
@@ -79,7 +90,7 @@ class_names = [
     'traffic-sign'    # 19
 ]
 
-mapping = {
+sem_kitti_slim_mapping = {
     'unlabelled':   'unlabelled', # 0
     'car':          'vehicle',    # 1
     'bicycle':      'vehicle',    # 2
@@ -106,12 +117,12 @@ reduced_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 
 reduced_colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
 reduced_colors = np.array(reduced_colors,np.uint8)
 label_id_to_name = {i:cat for i,cat in enumerate(reduced_class_names)}
-mapping_list = [reduced_class_names.index(mapping[name]) for name in class_names]
-mapping = np.array(mapping_list,dtype=np.int32)
+mapping_list = [reduced_class_names.index(sem_kitti_slim_mapping[name]) for name in class_names]
+mapping_pcd_img = np.array(mapping_list,dtype=np.int32)
 
 def process_data(fp,key):
     data = fp[key+'/pt'][()].astype(np.float32)
-    label = mapping[fp[key+'/label'][()].astype(np.uint8)]
+    label = mapping_pcd_img[fp[key+'/label'][()].astype(np.uint8)]
     # label = tmp[:,3].astype(np.uint8)
     # mark_removed = label != 3
     # data = data[mark_removed]

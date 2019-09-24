@@ -202,10 +202,10 @@ def vis(args):
     model.cuda()
     model.eval()
 
-    for i in range(100, len(test_data)):
-        handle.load(i)
+    for index in range(100, len(test_data)):
+        handle.load(index)
 
-        points = torch.from_numpy(test_data[i]).unsqueeze(0)
+        points = torch.from_numpy(test_data[index]).unsqueeze(0)
         points = points.transpose(2, 1).cuda()
         points[:,0] = points[:,0] / 70
         points[:,1] = points[:,1] / 70
@@ -219,9 +219,9 @@ def vis(args):
             pred_choice = pred.data.max(-1)[1].cpu().squeeze_(0).numpy()
             sem_label = pred_choice
 
-        print(i, pred_choice.shape)
+        print(index, pred_choice.shape)
         
-        pts_3d = test_data[i][:,:3]
+        pts_3d = test_data[index][:,:3]
         pts_2d = handle.project_3d_to_2d(pts_3d)
 
         colors = reduced_colors[pred_choice]
