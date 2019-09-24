@@ -186,7 +186,7 @@ def vis(args):
     test_dataset = SemKITTIDataLoader(test_data, test_label)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
-    log.debug('Building Model', args.model_name)
+    log.msg('Building Model', args.model_name)
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
     else:
@@ -194,12 +194,9 @@ def vis(args):
 
     torch.backends.cudnn.benchmark = True
     model = torch.nn.DataParallel(model)
-    log.debug('Using gpu:',args.gpu)
+    log.msg('Using gpu:',args.gpu)
 
-    if args.pretrain is None:
-        log.err('No pretrain model')
-
-    log.debug('Loading pretrain model...')
+    assert args.pretrain is not None,'No pretrain model'
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda()

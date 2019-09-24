@@ -126,10 +126,10 @@ def load_data(root, train = False, selected = None):
     fp = h5py.File(root,'r')
     train_data, train_label, test_data, test_label= [],[],[],[]
 
-    for part in selected:
+    for part in tqdm(selected, dynamic_ncols=True):
         length = part_length[part]
 
-        for index in tqdm(range(length), desc=' > Loading %s: %s'%(part, length), dynamic_ncols=True):
+        for index in range(length):
             key = '%s/%06d'%(part, index)
 
             if index < length * 0.4:
