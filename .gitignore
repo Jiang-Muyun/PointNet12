@@ -9,6 +9,7 @@ pretrain/
 *.h5
 # C extensions
 *.so
+*.pth
 
 # Distribution / packaging
 .Python

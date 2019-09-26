@@ -237,7 +237,7 @@ if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.model_name == 'pointnet':
-        args.pretrain = 'experiment/weights/kitti_semseg-pointnet-0.51023-0052.pth'
+        args.pretrain = 'checkpoint/kitti_semseg-pointnet-0.51023-0052.pth'
     else:
-        args.pretrain = 'experiment/weights/kitti_semseg-pointnet2-0.56290-0009.pth'
+        args.pretrain = 'checkpoint/kitti_semseg-pointnet2-0.56290-0009.pth'
     vis(args)
