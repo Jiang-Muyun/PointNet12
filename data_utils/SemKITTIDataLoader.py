@@ -6,67 +6,20 @@ from tqdm import tqdm
 import h5py
 from torch.utils.data import Dataset
 
-def jitter_point_cloud(batch_data, sigma=0.01, clip=0.05):
-    """ Randomly jitter points. jittering is per point.
-        Input:
-          BxNx3 array, original batch of point clouds
-        Return:
-          BxNx3 array, jittered batch of point clouds
-    """
-    assert len(batch_data.shape) == 3, batch_data.shape
-    B, N, C = batch_data.shape
-    assert(clip > 0)
-    jittered_data = np.clip(sigma * np.random.randn(B, N, C), -1*clip, clip)
-    jittered_data += batch_data
+def pcd_jitter(pcd, sigma=0.01, clip=0.05):
+    N, C = pcd.shape
+    jittered_data = np.clip(sigma * np.random.randn(B, N, C), -1*clip, clip).astype(pcd.dtype)
+    jittered_data += pcd
     return jittered_data
 
-# kitti_class_names = [
-#     'unlabelled',    # 1
-#     'road',          # 2
-#     'sidewalk',      # 3
-#     'building',      # 4
-#     'wall',          # 5
-#     'fence',         # 6
-#     'pole',          # 7
-#     'traffic_light', # 8
-#     'traffic_sign',  # 9
-#     'vegetation',    # 10
-#     'terrain',       # 11
-#     'sky',           # 12
-#     'person',        # 13
-#     'rider',         # 14
-#     'car',           # 15
-#     'truck',         # 16
-#     'bus',           # 17
-#     'train',         # 18
-#     'motorcycle',    # 19
-#     'bicycle'        # 20
-# ]
+def pcd_normalize(pcd):
+    pcd[:,0] = pcd[:,0] / 70
+    pcd[:,1] = pcd[:,1] / 70
+    pcd[:,2] = pcd[:,2] / 3
+    pcd[:,3] = (pcd[:,3] - 0.5)/2
+    pcd = np.clip(pcd,-1,1)
+    return pcd
 
-# kitti_mapping = {
-#     'unlabelled':    'unlabelled', # 0
-#     'road':          'ground',     # 1
-#     'sidewalk':      'ground',     # 2
-#     'building':      'structure',  # 3
-#     'wall':          'structure',  # 4
-#     'fence':         'structure',  # 5
-#     'pole':          'structure',  # 6
-#     'traffic_light': 'structure',  # 7
-#     'traffic_sign':  'structure',  # 8
-#     'vegetation':    'nature',     # 9
-#     'terrain':       'nature',     # 10
-#     'sky':           'nature',     # 11
-#     'person':        'human',      # 12
-#     'rider':         'human',      # 13
-#     'car':           'vehicle',    # 14
-#     'truck':         'vehicle',    # 15
-#     'bus':           'vehicle',    # 16
-#     'train':         'vehicle',    # 17
-#     'motorcycle':    'vehicle',    # 18
-#     'bicycle':       'vehicle'     # 19
-# }
-
-num_classes = 20
 class_names = [
     'unlabelled',     # 0
     'car',            # 1
@@ -121,12 +74,13 @@ name_to_index = {name:i for i,name in enumerate(slim_class_names)}
 mapping_list = [slim_class_names.index(sem_kitti_slim_mapping[name]) for name in class_names]
 mapping_pcd_img = np.array(mapping_list,dtype=np.int32)
 
-def process_data(fp,key):
-    data = fp[key+'/pt'][()].astype(np.float32)
-    label = fp[key+'/label'][()].astype(np.uint8)
-    return data, mapping_pcd_img[label]
 
 def load_data(root, train = False, selected = None):
+    def process_data(fp,key):
+        data = fp[key+'/pt'][()].astype(np.float32)
+        label = fp[key+'/label'][()].astype(np.uint8)
+        return data, mapping_pcd_img[label]
+
     part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
     if selected is None:
         selected = part_length.keys()
@@ -140,12 +94,12 @@ def load_data(root, train = False, selected = None):
         for index in range(length):
             key = '%s/%06d'%(part, index)
 
-            if index < length * 0.4:
+            if index < length * 0.3:
                 data,label = process_data(fp, key)
                 test_data.append(data)
                 test_label.append(label)
             
-            if train and index >= length * 0.4:
+            if train and index >= length * 0.3:
                 data,label = process_data(fp, key)
                 train_data.append(data)
                 train_label.append(label)
@@ -153,13 +107,11 @@ def load_data(root, train = False, selected = None):
     fp.close()
     return train_data, train_label, test_data, test_label
 
-
 class SemKITTIDataLoader(Dataset):
-    def __init__(self, data, labels, npoints = 6000, normalize=True ,data_augmentation = False):
+    def __init__(self, data, labels, npoints = 6000, data_augmentation = False):
         self.data = data
         self.labels = labels
         self.npoints = npoints
-        self.normalize = normalize
         self.data_augmentation = data_augmentation
 
     def __len__(self):
@@ -169,21 +121,10 @@ class SemKITTIDataLoader(Dataset):
         pcd = self.data[index]
         label = self.labels[index]
 
-        if self.normalize:
-            pcd[:,0] = pcd[:,0] / 70
-            pcd[:,1] = pcd[:,1] / 70
-            pcd[:,2] = pcd[:,2] / 3
-            pcd[:,3] = (pcd[:,3] - 0.5)/2
-            pcd = np.clip(pcd,-1,1)
+        pcd = pcd_normalize(pcd)
 
         if self.data_augmentation:
-            pcd = np.expand_dims(pcd,axis=0)
-            pcd = jitter_point_cloud(pcd).astype(np.float32)
-            pcd = np.squeeze(pcd, axis=0)
-        
-        # choice = np.random.choice(pcd.shape[0], self.npoints, replace=True)
-        # pcd = pcd[choice]
-        # label = label[choice]
+            pcd = pcd_jitter(pcd)
 
         length = pcd.shape[0]
         if length == self.npoints:
@@ -198,6 +139,7 @@ class SemKITTIDataLoader(Dataset):
             pcd = np.concatenate((pcd,pcd[0:rows_short]),axis=0)
             label = np.concatenate((label,label[0:rows_short]),axis=0)
         return pcd, label
+
 
 def print_distro(labels):
     count = [0] * num_classes
