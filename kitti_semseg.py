@@ -21,7 +21,7 @@ from model.pointnet2 import PointNet2SemSeg
 
 from utils import mkdir, select_avaliable
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
-from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, reduced_class_names, reduced_colors
+from data_utils.SemKITTIDataLoader import num_classes, index_to_name, slim_class_names, slim_colors
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
@@ -171,7 +171,7 @@ def train(args):
         test_metrics, cat_mean_iou = test_kitti_semseg(
             model.eval(), 
             testdataloader,
-            label_id_to_name,
+            index_to_name,
             args.model_name,
             num_classes = num_classes,
         )
@@ -199,9 +199,9 @@ def train(args):
 
 def evaluate(args):
     if args.model_name == 'pointnet':
-        args.pretrain = 'experiment/weights/kitti_semseg-pointnet-0.51023-0052.pth'
+        args.pretrain = 'checkpoints/kitti_semseg-pointnet-0.51023-0052.pth'
     else:
-        args.pretrain = 'experiment/weights/kitti_semseg-pointnet2-0.56290-0009.pth'
+        args.pretrain = 'checkpoints/kitti_semseg-pointnet2-0.56290-0009.pth'
 
     _,_,test_data, test_label = load_data(args.h5, train = False)
 
@@ -226,7 +226,7 @@ def evaluate(args):
     test_metrics, cat_mean_iou = test_kitti_semseg(
         model.eval(), 
         testdataloader,
-        label_id_to_name,
+        index_to_name,
         args.model_name,
         num_classes = num_classes,
     )

@@ -113,21 +113,18 @@ sem_kitti_slim_mapping = {
     'traffic-sign': 'structure'   # 19
 }
 num_classes = 6
-reduced_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
-reduced_colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
-reduced_colors = np.array(reduced_colors,np.uint8)
-label_id_to_name = {i:cat for i,cat in enumerate(reduced_class_names)}
-mapping_list = [reduced_class_names.index(sem_kitti_slim_mapping[name]) for name in class_names]
+slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
+colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
+slim_colors = np.array(colors,np.uint8)
+index_to_name = {i:name for i,name in enumerate(slim_class_names)}
+name_to_index = {name:i for i,name in enumerate(slim_class_names)}
+mapping_list = [slim_class_names.index(sem_kitti_slim_mapping[name]) for name in class_names]
 mapping_pcd_img = np.array(mapping_list,dtype=np.int32)
 
 def process_data(fp,key):
     data = fp[key+'/pt'][()].astype(np.float32)
-    label = mapping_pcd_img[fp[key+'/label'][()].astype(np.uint8)]
-    # label = tmp[:,3].astype(np.uint8)
-    # mark_removed = label != 3
-    # data = data[mark_removed]
-    # label = label[mark_removed]
-    return data, label
+    label = fp[key+'/label'][()].astype(np.uint8)
+    return data, mapping_pcd_img[label]
 
 def load_data(root, train = False, selected = None):
     part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}

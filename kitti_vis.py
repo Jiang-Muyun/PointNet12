@@ -25,7 +25,7 @@ from kitti_semseg import parse_args
 from kitti_base import calib_velo2cam,calib_cam2cam
 
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
-from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, reduced_class_names, reduced_colors
+from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, slim_class_names, slim_colors
 
 class Window_Manager():
     def __init__(self):
@@ -160,9 +160,9 @@ def export_video():
         cv2.putText(pn2, 'PointNet2', (20, 520), font,1, (255, 255, 255), 2, cv2.LINE_AA)
 
         merge = np.hstack((pn, pn2))
-        reduced_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
-        reduced_colors = [[255, 255, 255],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
-        for i,(name,c) in enumerate(zip(reduced_class_names, reduced_colors)):
+        slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
+        slim_colors = [[255, 255, 255],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
+        for i,(name,c) in enumerate(zip(slim_class_names, slim_colors)):
             cv2.putText(merge, name, (200 + i * 200, 50), font,1, [c[2],c[1],c[0]], 2, cv2.LINE_AA)
 
         cv2.line(merge,(0,70),(1600,70),(255,255,255),2)
@@ -224,7 +224,7 @@ def vis(args):
         pts_3d = test_data[index][:,:3]
         pts_2d = handle.project_3d_to_2d(pts_3d)
 
-        colors = reduced_colors[pred_choice]
+        colors = slim_colors[pred_choice]
         vis_handle.update(pts_3d, colors)
 
         img_semantic = handle.draw_2d_points(pts_2d, colors)
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.model_name == 'pointnet':
-        args.pretrain = 'checkpoint/kitti_semseg-pointnet-0.51023-0052.pth'
+        args.pretrain = 'checkpoints/kitti_semseg-pointnet-0.51023-0052.pth'
     else:
-        args.pretrain = 'checkpoint/kitti_semseg-pointnet2-0.56290-0009.pth'
+        args.pretrain = 'checkpoints/kitti_semseg-pointnet2-0.56290-0009.pth'
     vis(args)
