@@ -25,7 +25,8 @@ from kitti_semseg import parse_args
 from kitti_base import calib_velo2cam,calib_cam2cam
 
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
-from data_utils.SemKITTIDataLoader import num_classes, label_id_to_name, slim_class_names, slim_colors
+from data_utils.SemKITTIDataLoader import num_classes, slim_class_names, slim_colors, slim_colors_bgr
+from data_utils.Full_SemKITTIDataLoader import pcd_normalize
 
 class Window_Manager():
     def __init__(self):
@@ -123,7 +124,7 @@ class Semantic_KITTI_Slim():
         pts = pts_2d.astype(np.int32).tolist()
 
         for (x,y),c in zip(pts, colors.tolist()):
-            cv2.circle(image, (x, y), 2, [c[2],c[1],c[0]], -1)
+            cv2.circle(image, (x, y), 2, c, -1)
 
         return image
 
@@ -205,12 +206,10 @@ def vis(args):
     for index in range(100, len(test_data)):
         handle.load(index)
 
-        points = torch.from_numpy(test_data[index]).unsqueeze(0)
+        pcd = pcd_normalize(test_data[index].copy())
+        points = torch.from_numpy(pcd).unsqueeze(0)
         points = points.transpose(2, 1).cuda()
-        points[:,0] = points[:,0] / 70
-        points[:,1] = points[:,1] / 70
-        points[:,2] = points[:,2] / 3
-        points[:,3] = (points[:,3] - 0.5)/2
+
         with torch.no_grad():
             if args.model_name == 'pointnet':
                 pred, _ = model(points)
@@ -224,12 +223,10 @@ def vis(args):
         pts_3d = test_data[index][:,:3]
         pts_2d = handle.project_3d_to_2d(pts_3d)
 
-        colors = slim_colors[pred_choice]
-        vis_handle.update(pts_3d, colors)
+        vis_handle.update(pts_3d, slim_colors[pred_choice])
+        sem_img = handle.draw_2d_points(pts_2d, slim_colors_bgr[pred_choice])
 
-        img_semantic = handle.draw_2d_points(pts_2d, colors)
-
-        cv2.imshow('semantic', img_semantic)
+        cv2.imshow('semantic', sem_img)
         if 32 == cv2.waitKey(1):
             break
 

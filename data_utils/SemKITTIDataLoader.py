@@ -69,6 +69,7 @@ num_classes = 6
 slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
 colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
 slim_colors = np.array(colors,np.uint8)
+slim_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
 index_to_name = {i:name for i,name in enumerate(slim_class_names)}
 name_to_index = {name:i for i,name in enumerate(slim_class_names)}
 mapping_list = [slim_class_names.index(sem_kitti_slim_mapping[name]) for name in class_names]
