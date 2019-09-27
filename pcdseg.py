@@ -97,7 +97,7 @@ def train(args):
     dataset = Full_SemKITTILoader(root, 7000, train=True)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = Full_SemKITTILoader(root, 13000, train=False)
+    test_dataset = Full_SemKITTILoader(root, 15000, train=False)
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
     
     if args.model_name == 'pointnet':
