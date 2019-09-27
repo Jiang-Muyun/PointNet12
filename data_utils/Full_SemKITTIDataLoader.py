@@ -91,9 +91,9 @@ class Full_SemKITTILoader(Dataset):
         fn_velo, fn_label = self.fns[index]
 
         points = np.fromfile(fn_velo, dtype=np.float32).reshape(-1, 4)
+        label = np.fromfile(fn_label, dtype=np.uint32).reshape((-1))
         pcd = pcd_normalize(points)
 
-        label = np.fromfile(fn_label, dtype=np.uint32).reshape((-1))
 
         if label.shape[0] == points.shape[0]:
             sem_label = label & 0xFFFF  # semantic label in lower half
