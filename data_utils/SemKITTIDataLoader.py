@@ -140,18 +140,3 @@ class SemKITTIDataLoader(Dataset):
             pcd = np.concatenate((pcd,pcd[0:rows_short]),axis=0)
             label = np.concatenate((label,label[0:rows_short]),axis=0)
         return pcd, label
-
-
-def print_distro(labels):
-    count = [0] * num_classes
-    total = 0
-    for label in labels:
-        total += label.shape[0]
-        for i in range(num_classes):
-            count[i] += (label == i).sum()
-    print((np.array(count)/total*100).astype(np.int))
-
-if __name__ == "__main__":
-    train_data, train_label, test_data, test_label = load_data('experiment/pts_sem_voxel_0.10.h5',True)
-    print_distro(train_label)
-    print_distro(test_label)
