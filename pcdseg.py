@@ -20,8 +20,12 @@ from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
 from utils import mkdir, select_avaliable
-from data_utils.Full_SemKITTIDataLoader import Full_SemKITTILoader, num_classes, index_to_name
-root = os.environ['KITTI_ROOT']
+from data_utils.Full_SemKITTIDataLoader import Full_SemKITTILoader, Semantic_KITTI_Utils
+
+KITTI_ROOT = os.environ['KITTI_ROOT']
+kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='all', map_type = 'learning')
+num_classes = kitti_utils.num_classes
+index_to_name = kitti_utils.index_to_name
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
@@ -94,10 +98,10 @@ def train(args):
     experiment_dir = mkdir('experiment/')
     checkpoints_dir = mkdir('experiment/pcdseg/%s/'%(args.model_name))
 
-    dataset = Full_SemKITTILoader(root, 7000, train=True)
+    dataset = Full_SemKITTILoader(root, 7000, train=True, where='all', map_type = 'learning')
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = Full_SemKITTILoader(root, 15000, train=False)
+    test_dataset = Full_SemKITTILoader(root, 15000, train=False, where='all', map_type = 'learning')
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
     
     if args.model_name == 'pointnet':

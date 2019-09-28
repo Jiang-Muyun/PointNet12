@@ -25,8 +25,15 @@ from kitti_semseg import parse_args
 from kitti_base import calib_velo2cam,calib_cam2cam
 
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
-from data_utils.SemKITTIDataLoader import num_classes, slim_class_names, slim_colors, slim_colors_bgr
-from data_utils.Full_SemKITTIDataLoader import pcd_normalize
+from data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils
+
+KITTI_ROOT = os.environ['KITTI_ROOT']
+kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='all', map_type = 'learning')
+num_classes = kitti_utils.num_classes
+class_names = kitti_utils.class_names
+index_to_name = kitti_utils.index_to_name
+colors = kitti_utils.colors
+colors_bgr = kitti_utils.colors_bgr
 
 class Window_Manager():
     def __init__(self):
@@ -50,86 +57,7 @@ class Window_Manager():
     def capture_screen(self,fn):
         self.vis.capture_screen_image(fn, False)
 
-class Semantic_KITTI_Slim():
-    def __init__(self, root):
-        self.root = root
-        self.init()
-
-    def set_part(self, part='00'):
-        length = {
-            '00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,
-            '06':1100,'07':1100,'08':4070,'09':1590,'10':1200
-        }
-        assert part in length.keys(), 'Only %s are supported' %(length.keys())
-        self.sequence_root = os.path.join(self.root, 'sequences/%s/'%(part))
-        self.index = 0
-        self.max_index = length[part]
-        return self.max_index
-    
-    def get_max_index(self):
-        return self.max_index
-
-    def init(self):
-        self.R, self.T = calib_velo2cam('config/calib_velo_to_cam.txt')
-        self.P = calib_cam2cam('config/calib_cam_to_cam.txt' ,mode="02")
-        self.RT = np.concatenate((self.R, self.T), axis=1)
-
-        self.sem_cfg = yaml.load(open('config/semantic-kitti.yaml','r'), Loader=yaml.SafeLoader)
-        self.class_names = self.sem_cfg['labels']
-
-    def load(self,index = None):
-        """  Load the frame, point cloud and semantic labels from file """
-
-        self.index = index
-        if self.index == self.max_index:
-            print('End of sequence')
-            return False
-
-        fn_frame = os.path.join(self.sequence_root, 'image_2/%06d.png' % (self.index))
-        self.frame = cv2.imread(fn_frame)
-        return True
-
-    def project_3d_to_2d(self, pts_3d):
-        assert pts_3d.shape[1] == 3, pts_3d.shape
-        pts_3d = pts_3d.copy()
-        
-        # Create a [N,1] array
-        one_mat = np.ones((pts_3d.shape[0], 1),dtype=np.float32)
-
-        # Concat and change shape from [N,3] to [N,4] to [4,N]
-        xyz_v = np.concatenate((pts_3d, one_mat), axis=1).T
-
-        # convert velodyne coordinates(X_v, Y_v, Z_v) to camera coordinates(X_c, Y_c, Z_c)
-        for i in range(xyz_v.shape[1]):
-            xyz_v[:3, i] = np.matmul(self.RT, xyz_v[:, i])
-
-        xyz_c = xyz_v[:3]
-
-        # convert camera coordinates(X_c, Y_c, Z_c) image(pixel) coordinates(x,y)
-        for i in range(xyz_c.shape[1]):
-            xyz_c[:, i] = np.matmul(self.P, xyz_c[:, i])
-
-        # normalize image(pixel) coordinates(x,y)
-        xy_i = xyz_c / xyz_c[2]
-
-        # get pixels location
-        pts_2d = xy_i[:2].T
-        return pts_2d
-    
-    def draw_2d_points(self, pts_2d, colors):
-        """ draw 2d points in camera image """
-        assert pts_2d.shape[1] == 2, pts_2d.shape
-
-        image = self.frame.copy()
-        pts = pts_2d.astype(np.int32).tolist()
-
-        for (x,y),c in zip(pts, colors.tolist()):
-            cv2.circle(image, (x, y), 2, c, -1)
-
-        return image
-
 part = '03'
-KITTI_ROOT = '/media/james/Ubuntu_Data/dataset/KITTI/odometry/dataset/'
 
 def export_video():
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
@@ -161,9 +89,9 @@ def export_video():
         cv2.putText(pn2, 'PointNet2', (20, 520), font,1, (255, 255, 255), 2, cv2.LINE_AA)
 
         merge = np.hstack((pn, pn2))
-        slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
-        slim_colors = [[255, 255, 255],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
-        for i,(name,c) in enumerate(zip(slim_class_names, slim_colors)):
+        class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
+        colors = [[255, 255, 255],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
+        for i,(name,c) in enumerate(zip(class_names, colors)):
             cv2.putText(merge, name, (200 + i * 200, 50), font,1, [c[2],c[1],c[0]], 2, cv2.LINE_AA)
 
         cv2.line(merge,(0,70),(1600,70),(255,255,255),2)
@@ -179,14 +107,15 @@ def export_video():
     out.release()
 
 def vis(args):
-    handle = Semantic_KITTI_Slim(root = KITTI_ROOT)
-    handle.set_part(part)
     vis_handle = Window_Manager()
 
-    _,_,test_data, test_label = load_data(args.h5, train = False, selected = [part])
-    test_dataset = SemKITTIDataLoader(test_data, test_label)
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+    # _,_,test_data, test_label = load_data(args.h5, train = False, selected = [part])
+    # test_dataset = SemKITTIDataLoader(test_data, test_label)
+    # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
+    test_dataset = Full_SemKITTILoader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+    
     log.msg('Building Model', args.model_name)
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
@@ -197,16 +126,21 @@ def vis(args):
     model = torch.nn.DataParallel(model)
     log.msg('Using gpu:',args.gpu)
 
+    if args.model_name == 'pointnet':
+        args.pretrain = 'checkpoints/kitti_semseg-pointnet-0.51023-0052.pth'
+    else:
+        args.pretrain = 'checkpoints/kitti_semseg-pointnet2-0.56290-0009.pth'
+
     assert args.pretrain is not None,'No pretrain model'
     checkpoint = torch.load(args.pretrain)
     model.load_state_dict(checkpoint)
     model.cuda()
     model.eval()
 
-    for index in range(100, len(test_data)):
-        handle.load(index)
+    for index in range(100, kitti_utils.get_max_index(part)):
+        pcd, label = kitti_utils.get(part, index)
+        pcd = pcd_normalize(pcd)
 
-        pcd = pcd_normalize(test_data[index].copy())
         points = torch.from_numpy(pcd).unsqueeze(0)
         points = points.transpose(2, 1).cuda()
 
@@ -223,8 +157,8 @@ def vis(args):
         pts_3d = test_data[index][:,:3]
         pts_2d = handle.project_3d_to_2d(pts_3d)
 
-        vis_handle.update(pts_3d, slim_colors[pred_choice])
-        sem_img = handle.draw_2d_points(pts_2d, slim_colors_bgr[pred_choice])
+        vis_handle.update(pts_3d, colors[pred_choice])
+        sem_img = handle.draw_2d_points(pts_2d, colors_bgr[pred_choice])
 
         cv2.imshow('semantic', sem_img)
         if 32 == cv2.waitKey(1):
@@ -233,8 +167,4 @@ def vis(args):
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    if args.model_name == 'pointnet':
-        args.pretrain = 'checkpoints/kitti_semseg-pointnet-0.51023-0052.pth'
-    else:
-        args.pretrain = 'checkpoints/kitti_semseg-pointnet2-0.56290-0009.pth'
     vis(args)

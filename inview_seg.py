@@ -21,7 +21,16 @@ from model.pointnet2 import PointNet2SemSeg
 
 from utils import mkdir, select_avaliable
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
-from data_utils.SemKITTIDataLoader import num_classes, index_to_name, slim_class_names, slim_colors
+
+rom data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils
+
+KITTI_ROOT = os.environ['KITTI_ROOT']
+kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'slim')
+num_classes = kitti_utils.num_classes
+class_names = kitti_utils.class_names
+index_to_name = kitti_utils.index_to_name
+colors = kitti_utils.colors
+colors_bgr = kitti_utils.colors_bgr
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
@@ -93,14 +102,19 @@ def test_kitti_semseg(model, loader, catdict, model_name, num_classes):
 def train(args):
     experiment_dir = mkdir('experiment/')
     checkpoints_dir = mkdir('experiment/kitti_semseg/%s/'%(args.model_name))
-    train_data, train_label, test_data, test_label = load_data(args.h5, train = True)
 
-    dataset = SemKITTIDataLoader(train_data, train_label, npoints = 7000, data_augmentation = args.augment)
+    # train_data, train_label, test_data, test_label = load_data(args.h5, train = True)
+    # dataset = SemKITTIDataLoader(train_data, train_label, npoints = 7000, data_augmentation = args.augment)
+    # dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
+    # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
+    # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+    
+    dataset = Full_SemKITTILoader(root, 7000, train=True, where='inview', map_type = 'slim')
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
+    test_dataset = Full_SemKITTILoader(root, 15000, train=False, where='inview', map_type = 'slim')
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
-    
+
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
     else:
@@ -203,9 +217,11 @@ def evaluate(args):
     else:
         args.pretrain = 'checkpoints/kitti_semseg-pointnet2-0.56290-0009.pth'
 
-    _,_,test_data, test_label = load_data(args.h5, train = False)
+    # _,_,test_data, test_label = load_data(args.h5, train = False)
+    # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
+    # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
-    test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
+    test_dataset = Full_SemKITTILoader(root, 15000, train=False, where='inview', map_type = 'slim')
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
     log.msg('Building Model', model_name = args.model_name)

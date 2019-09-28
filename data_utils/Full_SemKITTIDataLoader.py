@@ -7,9 +7,11 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 import threading
 import multiprocessing 
+import redis
 
 def pcd_jitter(pcd, sigma=0.01, clip=0.05):
     N, C = pcd.shape
+    pcd = pcd.copy()
     jittered_data = np.clip(sigma * np.random.randn(N, C), -1*clip, clip).astype(pcd.dtype)
     jittered_data += pcd
     return jittered_data
@@ -21,6 +23,7 @@ def pcd_normalize(pcd):
     pcd[:,3] = (pcd[:,3] - 0.5)/2
     pcd = np.clip(pcd,-1,1)
     return pcd
+
 
 class_names = [
     'unlabelled',     # 0
@@ -45,11 +48,28 @@ class_names = [
     'traffic-sign'    # 19
 ]
 
-num_classes = 20
-index_to_name = {i:name for i,name in enumerate(class_names)}
-name_to_index = {name:i for i,name in enumerate(class_names)}
-
-import redis
+sem_kitti_slim_mapping = {
+    'unlabelled':   'unlabelled', # 0
+    'car':          'vehicle',    # 1
+    'bicycle':      'vehicle',    # 2
+    'motorcycle':   'vehicle',    # 3
+    'truck':        'vehicle',    # 4
+    'other-vehicle':'vehicle',    # 5
+    'person':       'human',      # 6
+    'bicyclist':    'human',      # 7
+    'motorcyclist': 'human',      # 8
+    'road':         'ground',     # 9
+    'parking':      'ground',     # 10
+    'sidewalk':     'ground',     # 11
+    'other-ground': 'ground',     # 12
+    'building':     'structure',  # 13
+    'fence':        'structure',  # 14
+    'vegetation':   'nature',     # 15
+    'trunk':        'nature',     # 16
+    'terrain':      'ground',     # 17
+    'pole':         'structure',  # 18
+    'traffic-sign': 'structure'   # 19
+}
 
 def toRedis(r, key, array):
     assert len(array.shape) == 1
@@ -63,12 +83,227 @@ def fromRedis(r, key):
    array = np.frombuffer(encoded, dtype=np.float32, offset=0)
    return array
 
+class Semantic_KITTI_Utils():
+    def __init__(self, root, where = 'all', map_type = 'learning'):
+        self.root = root
+
+        self.R, self.T = calib_velo2cam('config/calib_velo_to_cam.txt')
+        self.P = calib_cam2cam('config/calib_cam_to_cam.txt' ,mode="02")
+        self.RT = np.concatenate((self.R, self.T), axis=1)
+
+        self.sem_cfg = yaml.load(open('config/semantic-kitti.yaml','r'), Loader=yaml.SafeLoader)
+        self.class_names = self.sem_cfg['labels']
+        self.learning_map = self.sem_cfg['learning_map']
+        self.learning_map_inv = self.sem_cfg['learning_map_inv']
+        self.learning_ignore = self.sem_cfg['learning_ignore']
+        self.sem_color_map = self.sem_cfg['color_map']
+
+        self.length = {
+            '00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,
+            '06':1100,'07':1100,'08':4070,'09':1590,'10':1200
+        }
+        assert where in ['all', 'view'], where
+        assert map_type in ['learning','slim'], map_type
+
+        self.where = where
+        self.map_type = map_type
+
+        if self.map_type == 'learning':
+            self.num_classes = 20
+            self.index_to_name = {i:name for i,name in enumerate(class_names)}
+            self.name_to_index = {name:i for i,name in enumerate(class_names)}
+            self.class_names = class_names
+        
+        if self.map_type == 'slim':
+            num_classes = 6
+            slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
+            colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
+            slim_colors = np.array(colors,np.uint8)
+            slim_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
+            self.index_to_name = {i:name for i,name in enumerate(slim_class_names)}
+            self.name_to_index = {name:i for i,name in enumerate(slim_class_names)}
+            mapping_list = [slim_class_names.index(sem_kitti_slim_mapping[name]) for name in class_names]
+            self.slim_mapping = np.array(mapping_list,dtype=np.int32)
+
+            self.num_classes = num_classes
+            self.class_names = slim_class_names
+            self.colors = slim_colors
+            self.colors_bgr = slim_colors_bgr
+
+    def get(self, part, index, load_image = False):
+        
+        sequence_root = os.path.join(self.root, 'sequences/%s/'%(part))
+        assert index <= self.length[part], index
+
+        if load_image:
+            fn_frame = os.path.join(sequence_root, 'image_2/%06d.png' % (index))
+            assert os.path.exists(fn_frame), 'Broken dataset %s' % (fn_frame)
+            self.frame = cv2.imread(fn_frame)
+            assert self.frame is not None, 'Broken dataset %s' % (fn_frame)
+
+        fn_velo = os.path.join(sequence_root, 'velodyne/%06d.bin' %(index))
+        fn_label = os.path.join(sequence_root, 'labels/%06d.label' %(index))
+        assert os.path.exists(fn_velo), 'Broken dataset %s' % (fn_velo)
+        assert os.path.exists(fn_label), 'Broken dataset %s' % (fn_label)
+            
+        points = np.fromfile(fn_velo, dtype=np.float32).reshape(-1, 4)
+        label = np.fromfile(fn_label, dtype=np.uint32).reshape((-1))
+
+        if label.shape[0] == points.shape[0]:
+            sem_label = label & 0xFFFF  # semantic label in lower half
+            inst_label = label >> 16  # instance id in upper half
+            assert((sem_label + (inst_label << 16) == label).all()) # sanity check
+        else:
+            print("Points shape: ", points.shape)
+            print("Label shape: ", label.shape)
+            raise ValueError("Scan and Label don't contain same number of points")
+
+        if self.where == 'inview':
+            handle.set_filter([-40, 40], [-20, 20])
+            combined = self.points_basic_filter(points)
+            points = self.points[combined]
+            label = self.sem_label[combined]
+
+        label = np.array([self.learning_map[x] for x in label], dtype=np.int32)
+
+        if self.map_type == 'slim':
+            label = np.array([self.slim_mapping[x] for x in label], dtype=np.int32)
+
+        return points, label
+    
+    def set_filter(self, h_fov, v_fov, x_range = None, y_range = None, z_range = None, d_range = None):
+        self.h_fov = h_fov if h_fov is not None else (-180, 180)
+        self.v_fov = v_fov if v_fov is not None else (-25, 20)
+        self.x_range = x_range if x_range is not None else (-10000, 10000)
+        self.y_range = y_range if y_range is not None else (-10000, 10000)
+        self.z_range = z_range if z_range is not None else (-10000, 10000)
+        self.d_range = d_range if d_range is not None else (-10000, 10000)
+
+    def hv_in_range(self, m, n, fov, fov_type='h'):
+        """ extract filtered in-range velodyne coordinates based on azimuth & elevation angle limit 
+            horizontal limit = azimuth angle limit
+            vertical limit = elevation angle limit
+        """
+        if fov_type == 'h':
+            return np.logical_and(np.arctan2(n, m) > (-fov[1] * np.pi / 180), \
+                                    np.arctan2(n, m) < (-fov[0] * np.pi / 180))
+        elif fov_type == 'v':
+            return np.logical_and(np.arctan2(n, m) < (fov[1] * np.pi / 180), \
+                                    np.arctan2(n, m) > (fov[0] * np.pi / 180))
+        else:
+            raise NameError("fov type must be set between 'h' and 'v' ")
+
+    def box_in_range(self,x,y,z,d, x_range, y_range, z_range, d_range):
+        """ extract filtered in-range velodyne coordinates based on x,y,z limit """
+        return np.logical_and.reduce((
+                x > x_range[0], x < x_range[1],
+                y > y_range[0], y < y_range[1],
+                z > z_range[0], z < z_range[1],
+                d > d_range[0], d < d_range[1]))
+
+    def points_basic_filter(self, points):
+        """
+            filter points based on h,v FOV and x,y,z distance range.
+            x,y,z direction is based on velodyne coordinates
+            1. azimuth & elevation angle limit check
+            2. x,y,z distance limit
+            return a bool array
+        """
+        assert points.shape[1] == 4, points.shape # [N,3]
+        x, y, z = points[:, 0], points[:, 1], points[:, 2]
+        d = np.sqrt(x ** 2 + y ** 2 + z ** 2) # this is much faster than d = np.sqrt(np.power(points,2).sum(1))
+
+        # extract in-range fov points
+        h_points = self.hv_in_range(x, y, self.h_fov, fov_type='h')
+        v_points = self.hv_in_range(d, z, self.v_fov, fov_type='v')
+        combined = np.logical_and(h_points, v_points)
+
+        # extract in-range x,y,z points
+        in_range = self.box_in_range(x,y,z,d, self.x_range, self.y_range, self.z_range, self.d_range)
+        combined = np.logical_and(combined, in_range)
+
+        return combined
+
+    def calib_velo2cam(self, fn_v2c):
+        """
+        get Rotation(R : 3x3), Translation(T : 3x1) matrix info
+        using R,T matrix, we can convert velodyne coordinates to camera coordinates
+        """
+        for line in open(fn_v2c, "r"):
+            (key, val) = line.split(':', 1)
+            if key == 'R':
+                R = np.fromstring(val, sep=' ')
+                R = R.reshape(3, 3)
+            if key == 'T':
+                T = np.fromstring(val, sep=' ')
+                T = T.reshape(3, 1)
+        return R, T
+
+    def calib_cam2cam(self, fn_c2c, mode = '02'):
+        """
+        If your image is 'rectified image' :get only Projection(P : 3x4) matrix is enough
+        but if your image is 'distorted image'(not rectified image) :
+            you need undistortion step using distortion coefficients(5 : D)
+        In this code, only P matrix info is used for rectified image
+        """
+        # with open(fn_c2c, "r") as f: c2c_file = f.readlines()
+        for line in open(fn_c2c, "r"):
+            (key, val) = line.split(':', 1)
+            if key == ('P_rect_' + mode):
+                P = np.fromstring(val, sep=' ')
+                P = P.reshape(3, 4)
+                P = P[:3, :3]  # erase 4th column ([0,0,0])
+        return P
+
+    def project_3d_to_2d(self, pts_3d):
+        assert pts_3d.shape[1] == 3, pts_3d.shape
+        pts_3d = pts_3d.copy()
+        
+        # Create a [N,1] array
+        one_mat = np.ones((pts_3d.shape[0], 1),dtype=np.float32)
+
+        # Concat and change shape from [N,3] to [N,4] to [4,N]
+        xyz_v = np.concatenate((pts_3d, one_mat), axis=1).T
+
+        # convert velodyne coordinates(X_v, Y_v, Z_v) to camera coordinates(X_c, Y_c, Z_c)
+        for i in range(xyz_v.shape[1]):
+            xyz_v[:3, i] = np.matmul(self.RT, xyz_v[:, i])
+
+        xyz_c = xyz_v[:3]
+
+        # convert camera coordinates(X_c, Y_c, Z_c) image(pixel) coordinates(x,y)
+        for i in range(xyz_c.shape[1]):
+            xyz_c[:, i] = np.matmul(self.P, xyz_c[:, i])
+
+        # normalize image(pixel) coordinates(x,y)
+        xy_i = xyz_c / xyz_c[2]
+
+        # get pixels location
+        pts_2d = xy_i[:2].T
+        return pts_2d
+
+    def draw_2d_points(self, pts_2d, colors):
+        """ draw 2d points in camera image """
+        assert pts_2d.shape[1] == 2, pts_2d.shape
+
+        image = self.frame.copy()
+        pts = pts_2d.astype(np.int32).tolist()
+
+        for (x,y),c in zip(pts, colors.tolist()):
+            cv2.circle(image, (x, y), 2, c, -1)
+
+        return image
+
+    def get_max_index(self,part):
+        return self.length[part]
+
 class Full_SemKITTILoader(Dataset):
-    def __init__(self, root, npoints, train = True):
+    def __init__(self, root, npoints, train = True, where = 'all', map_type = 'learning'):
         self.root = root
         self.train = train
         self.npoints = npoints
         self.r = redis.Redis(host='127.0.0.1', port=6379, db=0)
+        self.utils = Semantic_KITTI_Utils(root,where,map_type)
 
         part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
 
@@ -84,16 +319,6 @@ class Full_SemKITTILoader(Dataset):
                     if part_index < length * 0.3:
                         self.keys.append('%s/%06d'%(part, part_index))
 
-        sem_cfg = yaml.load(open('config/semantic-kitti.yaml','r'), Loader=yaml.SafeLoader)
-        self.class_names = sem_cfg['labels']
-        self.learning_map = sem_cfg['learning_map']
-
-    def learning_mapping(self,sem_label):
-        # Note: Here the 19 classs are different from the original KITTI 19 classes
-        sem_label_learn = [self.learning_map[x] for x in sem_label]
-        sem_label_learn = np.array(sem_label_learn).astype(np.int32)
-        return sem_label_learn
-
     def __len__(self):
             return len(self.keys)
 
@@ -101,31 +326,10 @@ class Full_SemKITTILoader(Dataset):
         data = fromRedis(self.r, key)
         if data is None:
             part, part_index = key.split('/')
-            fn_velo = os.path.join(self.root, '%s/velodyne/%s.bin'%(part, part_index))
-            fn_label = os.path.join(self.root, '%s/labels/%s.label'%(part, part_index))
-            assert os.path.exists(fn_velo), 'Broken dataset %s' % (fn_velo)
-            assert os.path.exists(fn_label), 'Broken dataset %s' % (fn_label)
-
-            points = np.fromfile(fn_velo, dtype=np.float32).reshape(-1, 4)
-            label = np.fromfile(fn_label, dtype=np.int32).reshape((-1))
-        
-            pcd = pcd_normalize(points)
-
-            if label.shape[0] == points.shape[0]:
-                sem_label = label & 0xFFFF  # semantic label in lower half
-                inst_label = label >> 16  # instance id in upper half
-                assert((sem_label + (inst_label << 16) == label).all()) # sanity check
-            else:
-                print("Points shape: ", points.shape)
-                print("Label shape: ", label.shape)
-                raise ValueError("Scan and Label don't contain same number of points")
-            
-            label = self.learning_mapping(sem_label)
+            pcd, label = self.utils.get(part, int(part_index))
             to_store = np.concatenate((pcd, label.reshape((-1,1)).astype(np.float32)),axis=1).reshape((-1,))
             toRedis(self.r, key, to_store)
-            
-            print('add', key)
-            
+            print('add', key, pcd.shape, label.shape, len(np.unique(label)))
         else:
             data = data.reshape((-1,5))
             pcd = data[:,:4]
@@ -156,10 +360,10 @@ if __name__ == "__main__":
     from torch.utils.data import DataLoader
     root = os.environ['KITTI_ROOT']
 
-    dataset = Full_SemKITTILoader(root, 7000, train=True)
+    dataset = Full_SemKITTILoader(root, 7000, train=True, where='all', map_type = 'learning')
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=6)
     
-    test_dataset = Full_SemKITTILoader(root, 13000, train=False)
+    test_dataset = Full_SemKITTILoader(root, 13000, train=False, where='all', map_type = 'learning')
     testdataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=6)
 
     for i in range(2):
