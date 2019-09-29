@@ -331,14 +331,14 @@ class Full_SemKITTILoader(Dataset):
             return len(self.keys)
 
     def get_data(self, key):
-        data = fromRedis(self.r, key)
-        if data is None:
+        if not redis.exists(key):
             part, part_index = key.split('/')
             pcd, label = self.utils.get(part, int(part_index))
             to_store = np.concatenate((pcd, label.reshape((-1,1)).astype(np.float32)),axis=1).reshape((-1,))
             toRedis(self.r, key, to_store)
             print('add', key, pcd.shape, label.shape, len(np.unique(label)))
         else:
+            data = fromRedis(self.r, key)
             data = data.reshape((-1,5))
             pcd = data[:,:4]
             label = data[:,4].astype(np.int32)

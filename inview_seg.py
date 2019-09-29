@@ -20,9 +20,7 @@ from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
 from utils import mkdir, select_avaliable
-from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
-
-from data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils
+from data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils, Full_SemKITTILoader
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'slim')
@@ -109,10 +107,10 @@ def train(args):
     # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
     # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
     
-    dataset = Full_SemKITTILoader(root, 7000, train=True, where='inview', map_type = 'slim')
+    dataset = Full_SemKITTILoader(KITTI_ROOT, 7000, train=True, where='inview', map_type = 'slim')
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = Full_SemKITTILoader(root, 15000, train=False, where='inview', map_type = 'slim')
+    test_dataset = Full_SemKITTILoader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
     if args.model_name == 'pointnet':
@@ -150,7 +148,7 @@ def train(args):
 
     for epoch in range(init_epoch,args.epoch):
         lr = calc_decay(args.learning_rate, epoch)
-        log.info(job='kitti_semseg',model=args.model_name,gpu=args.gpu, epoch=epoch, lr=lr)
+        log.info(job='inview',model=args.model_name,gpu=args.gpu, epoch=epoch, lr=lr)
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -200,7 +198,7 @@ def train(args):
             save_model = True
         
         if save_model:
-            fn_pth = 'kitti_semseg-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
+            fn_pth = 'inview-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
             log.msg(cat_mean_iou)
@@ -221,7 +219,7 @@ def evaluate(args):
     # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
     # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
-    test_dataset = Full_SemKITTILoader(root, 15000, train=False, where='inview', map_type = 'slim')
+    test_dataset = Full_SemKITTILoader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
     log.msg('Building Model', model_name = args.model_name)

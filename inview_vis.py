@@ -21,10 +21,7 @@ import my_log as log
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
-from kitti_semseg import parse_args
-from kitti_base import calib_velo2cam,calib_cam2cam
-
-from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
+from inview_seg import parse_args
 from data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
@@ -109,13 +106,6 @@ def export_video():
 def vis(args):
     vis_handle = Window_Manager()
 
-    # _,_,test_data, test_label = load_data(args.h5, train = False, selected = [part])
-    # test_dataset = SemKITTIDataLoader(test_data, test_label)
-    # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
-
-    test_dataset = Full_SemKITTILoader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
-    
     log.msg('Building Model', args.model_name)
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
@@ -127,9 +117,9 @@ def vis(args):
     log.msg('Using gpu:',args.gpu)
 
     if args.model_name == 'pointnet':
-        args.pretrain = 'checkpoints/kitti_semseg-pointnet-0.51023-0052.pth'
+        args.pretrain = 'checkpoints/inview-pointnet-0.51023-0052.pth'
     else:
-        args.pretrain = 'checkpoints/kitti_semseg-pointnet2-0.56290-0009.pth'
+        args.pretrain = 'checkpoints/inview-pointnet2-0.56290-0009.pth'
 
     assert args.pretrain is not None,'No pretrain model'
     checkpoint = torch.load(args.pretrain)
@@ -138,8 +128,8 @@ def vis(args):
     model.eval()
 
     for index in range(100, kitti_utils.get_max_index(part)):
-        pcd, label = kitti_utils.get(part, index)
-        pcd = pcd_normalize(pcd)
+        point_cloud, label = kitti_utils.get(part, index, load_image=True)
+        pcd = pcd_normalize(point_cloud)
 
         points = torch.from_numpy(pcd).unsqueeze(0)
         points = points.transpose(2, 1).cuda()
@@ -154,11 +144,11 @@ def vis(args):
 
         print(index, pred_choice.shape)
         
-        pts_3d = test_data[index][:,:3]
-        pts_2d = handle.project_3d_to_2d(pts_3d)
+        pts_3d = point_cloud[:,:3]
+        pts_2d = kitti_utils.project_3d_to_2d(pts_3d)
 
         vis_handle.update(pts_3d, colors[pred_choice])
-        sem_img = handle.draw_2d_points(pts_2d, colors_bgr[pred_choice])
+        sem_img = kitti_utils.draw_2d_points(pts_2d, colors_bgr[pred_choice])
 
         cv2.imshow('semantic', sem_img)
         if 32 == cv2.waitKey(1):
