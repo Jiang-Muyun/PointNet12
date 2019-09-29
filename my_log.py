@@ -1,5 +1,18 @@
-import time
+import os
 import sys
+import time
+import numpy as np
+import torch
+import torch.nn.parallel
+import torch.nn as nn
+import torch.utils.data
+import torch.optim as optim
+import torchvision.transforms as T
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+
+
+# Logging
 
 def gray(x):    return '\033[90m' + str(x) + '\033[0m'
 def red(x):     return '\033[91m' + str(x) + '\033[0m'
@@ -46,6 +59,72 @@ def warn(*args, **kwargs):
 def err(*args, **kwargs):
     print_base(red, *args, **kwargs)
 
+
+# utils
+
+def mkdir(fn):
+    os.makedirs(fn, exist_ok=True)
+    return fn
+
+def select_avaliable(fn_list):
+    selected = None
+    for fn in fn_list:
+        if os.path.exists(fn):
+            selected = fn
+            break
+    if selected is None:
+        log.err(log.yellow("Could not find dataset from"), fn_list)
+    else:
+        return selected
+
+# Numpy functions
+
+def num(x):
+    return x.detach().cpu().numpy()
+
+def norm_01(x):
+    return (x - x.min())/(x.max() - x.min() + + 1e-6)
+
+def relu(x):
+    return np.maximum(0, x)
+
+def np_l2_sum(x):
+    return np.sqrt(np.square(x.copy()).sum())
+
+def np_l2_mean(x):
+    return np.sqrt(np.square(x.copy()).mean())
+
+def np_inf_norm(x):
+    return np.linalg.norm(x, ord=np.inf_norm)
+
+def np_clip_by_l2norm(x, clip_norm):
+    return x * clip_norm / np.linalg.norm(x, ord=2)
+
+def np_clip_by_infnorm(x, clip_norm):
+    return x * clip_norm / np.linalg.norm(x, ord=np.inf)
+
+# Display functions
+
+def print_mat(x):
+    info(x.shape, x.dtype, min=x.min(), max=x.max())
+
+def print_l2(x):
+    info(x.shape,min=x.min(),max=x.max(),sum_l2 =np_l2_sum(x),mean_l2=np_l2_mean(x))
+
+def get_fig(figsize=(8,4)):
+    fig = plt.figure(figsize=figsize, dpi=100, facecolor='w', edgecolor='k')
+    return fig
+    
+def sub_plot(fig, rows, cols, index, title, image):
+    axis = fig.add_subplot(rows, cols, index)
+    if title != None:
+        axis.title.set_text(title)
+    axis.axis('off')
+    plt.imshow(image)
+
+
+# Timing
+
 class Tick():
     def __init__(self, name='', silent=False):
         self.name = name
@@ -86,10 +165,3 @@ class Tock():
         else:
             print(yellow('.'), end='')
         sys.stdout.flush()
-
-
-if __name__ == '__main__':
-    debug('debug',arg='testing')
-    info('info',arg='testing')
-    warn('warn',arg='testing')
-    err('err',arg='testing')

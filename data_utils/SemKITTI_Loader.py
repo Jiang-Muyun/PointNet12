@@ -112,27 +112,42 @@ class Semantic_KITTI_Utils():
         self.where = where
         self.map_type = map_type
 
+        colors = [[128, 64, 128],[244, 35, 232],[70, 70, 70],[102, 102, 156],
+                    [190, 153, 153],[153, 153, 153],[250, 170, 30],[220, 220, 0],
+                    [107, 142, 35],[152, 251, 152],[0, 130, 180],[220, 20, 60],
+                    [255, 0, 0],[0, 0, 142],[0, 0, 70],[0, 60, 100],[0, 80, 100],
+                    [0, 0, 230],[119, 11, 32]]
+        self.kitti_colors = np.array(colors,np.uint8)
+        self.kitti_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
+        
+        colors = [
+            [0, 0, 0],[245, 150, 100],[30, 30, 255],
+            [255, 0, 255],[0, 200, 255],[0, 175, 0]]
+        self.slim_colors = np.array(colors,np.uint8)
+        self.slim_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
+
         if self.map_type == 'learning':
             self.num_classes = 20
             self.index_to_name = {i:name for i,name in enumerate(class_names)}
             self.name_to_index = {name:i for i,name in enumerate(class_names)}
             self.class_names = class_names
-        
+
+            self.colors = self.kitti_colors
+            self.colors_bgr = self.kitti_colors_bgr
+
         if self.map_type == 'slim':
             num_classes = 6
             slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
-            colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
-            slim_colors = np.array(colors,np.uint8)
-            slim_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
             self.index_to_name = {i:name for i,name in enumerate(slim_class_names)}
             self.name_to_index = {name:i for i,name in enumerate(slim_class_names)}
+            
             mapping_list = [slim_class_names.index(sem_kitti_slim_mapping[name]) for name in class_names]
             self.slim_mapping = np.array(mapping_list,dtype=np.int32)
 
             self.num_classes = num_classes
             self.class_names = slim_class_names
-            self.colors = slim_colors
-            self.colors_bgr = slim_colors_bgr
+            self.colors = self.slim_colors
+            self.colors_bgr = self.slim_colors_bgr
 
     def get(self, part, index, load_image = False):
         
