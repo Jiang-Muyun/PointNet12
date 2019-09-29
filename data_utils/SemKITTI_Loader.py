@@ -305,7 +305,7 @@ class Semantic_KITTI_Utils():
     def get_max_index(self,part):
         return self.length[part]
 
-class Full_SemKITTILoader(Dataset):
+class SemKITTI_Loader(Dataset):
     def __init__(self, root, npoints, train = True, where = 'all', map_type = 'learning'):
         self.root = root
         self.train = train

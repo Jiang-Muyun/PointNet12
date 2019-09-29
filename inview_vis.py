@@ -22,7 +22,7 @@ from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
 from inview_seg import parse_args
-from data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils
+from data_utils.SemKITTI_Loader import pcd_normalize, Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'slim')
@@ -53,8 +53,6 @@ class Window_Manager():
 
     def capture_screen(self,fn):
         self.vis.capture_screen_image(fn, False)
-
-part = '03'
 
 def export_video():
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
@@ -104,6 +102,7 @@ def export_video():
     out.release()
 
 def vis(args):
+    part = '03'
     vis_handle = Window_Manager()
 
     log.msg('Building Model', args.model_name)
@@ -127,7 +126,7 @@ def vis(args):
     model.cuda()
     model.eval()
 
-    for index in range(100, kitti_utils.get_max_index(part)):
+    for index in range(160, kitti_utils.get_max_index(part)):
         point_cloud, label = kitti_utils.get(part, index, load_image=True)
         pcd = pcd_normalize(point_cloud)
 

@@ -20,7 +20,7 @@ from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 
 from utils import mkdir, select_avaliable
-from data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils, Full_SemKITTILoader
+from data_utils.SemKITTI_Loader import pcd_normalize, Semantic_KITTI_Utils, SemKITTI_Loader
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'slim')
@@ -107,10 +107,10 @@ def train(args):
     # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
     # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
     
-    dataset = Full_SemKITTILoader(KITTI_ROOT, 7000, train=True, where='inview', map_type = 'slim')
+    dataset = SemKITTI_Loader(KITTI_ROOT, 7000, train=True, where='inview', map_type = 'slim')
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = Full_SemKITTILoader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
     if args.model_name == 'pointnet':
@@ -219,7 +219,7 @@ def evaluate(args):
     # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
     # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
-    test_dataset = Full_SemKITTILoader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
     log.msg('Building Model', model_name = args.model_name)
