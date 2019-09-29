@@ -28,7 +28,7 @@ from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
 from data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
-kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='all', map_type = 'learning')
+kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'slim')
 num_classes = kitti_utils.num_classes
 class_names = kitti_utils.class_names
 index_to_name = kitti_utils.index_to_name

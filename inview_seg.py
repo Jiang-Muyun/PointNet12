@@ -22,7 +22,7 @@ from model.pointnet2 import PointNet2SemSeg
 from utils import mkdir, select_avaliable
 from data_utils.SemKITTIDataLoader import SemKITTIDataLoader, load_data
 
-rom data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils
+from data_utils.Full_SemKITTIDataLoader import pcd_normalize, Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'slim')

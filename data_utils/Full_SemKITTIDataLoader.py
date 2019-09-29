@@ -1,4 +1,5 @@
 import os
+import cv2
 import json
 import yaml
 import numpy as np
@@ -8,22 +9,22 @@ from torch.utils.data import Dataset
 import threading
 import multiprocessing 
 import redis
+from PIL import Image
 
 def pcd_jitter(pcd, sigma=0.01, clip=0.05):
     N, C = pcd.shape
-    pcd = pcd.copy()
     jittered_data = np.clip(sigma * np.random.randn(N, C), -1*clip, clip).astype(pcd.dtype)
     jittered_data += pcd
     return jittered_data
 
 def pcd_normalize(pcd):
+    pcd = pcd.copy()
     pcd[:,0] = pcd[:,0] / 70
     pcd[:,1] = pcd[:,1] / 70
     pcd[:,2] = pcd[:,2] / 3
     pcd[:,3] = (pcd[:,3] - 0.5)/2
     pcd = np.clip(pcd,-1,1)
     return pcd
-
 
 class_names = [
     'unlabelled',     # 0
@@ -87,11 +88,14 @@ class Semantic_KITTI_Utils():
     def __init__(self, root, where = 'all', map_type = 'learning'):
         self.root = root
 
-        self.R, self.T = calib_velo2cam('config/calib_velo_to_cam.txt')
-        self.P = calib_cam2cam('config/calib_cam_to_cam.txt' ,mode="02")
+        base_path = os.path.dirname(os.path.realpath(__file__)) + '/../'
+
+        self.R, self.T = self.calib_velo2cam(base_path+'config/calib_velo_to_cam.txt')
+        self.P = self.calib_cam2cam(base_path+'config/calib_cam_to_cam.txt' ,mode="02")
         self.RT = np.concatenate((self.R, self.T), axis=1)
 
-        self.sem_cfg = yaml.load(open('config/semantic-kitti.yaml','r'), Loader=yaml.SafeLoader)
+        self.sem_cfg = yaml.load(open(base_path+'config/semantic-kitti.yaml','r'), Loader=yaml.SafeLoader)
+        
         self.class_names = self.sem_cfg['labels']
         self.learning_map = self.sem_cfg['learning_map']
         self.learning_map_inv = self.sem_cfg['learning_map_inv']
@@ -102,7 +106,7 @@ class Semantic_KITTI_Utils():
             '00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,
             '06':1100,'07':1100,'08':4070,'09':1590,'10':1200
         }
-        assert where in ['all', 'view'], where
+        assert where in ['all', 'inview'], where
         assert map_type in ['learning','slim'], map_type
 
         self.where = where
@@ -138,8 +142,9 @@ class Semantic_KITTI_Utils():
         if load_image:
             fn_frame = os.path.join(sequence_root, 'image_2/%06d.png' % (index))
             assert os.path.exists(fn_frame), 'Broken dataset %s' % (fn_frame)
-            self.frame = cv2.imread(fn_frame)
-            assert self.frame is not None, 'Broken dataset %s' % (fn_frame)
+            # self.frame = cv2.imread(fn_frame)
+            self.frame_PIL = Image.open(fn_frame)
+            self.frame = np.array(self.frame_PIL)
 
         fn_velo = os.path.join(sequence_root, 'velodyne/%06d.bin' %(index))
         fn_label = os.path.join(sequence_root, 'labels/%06d.label' %(index))
@@ -159,10 +164,10 @@ class Semantic_KITTI_Utils():
             raise ValueError("Scan and Label don't contain same number of points")
 
         if self.where == 'inview':
-            handle.set_filter([-40, 40], [-20, 20])
+            self.set_filter([-40, 40], [-20, 20])
             combined = self.points_basic_filter(points)
-            points = self.points[combined]
-            label = self.sem_label[combined]
+            points = points[combined]
+            label = sem_label[combined]
 
         label = np.array([self.learning_map[x] for x in label], dtype=np.int32)
 
@@ -282,11 +287,14 @@ class Semantic_KITTI_Utils():
         pts_2d = xy_i[:2].T
         return pts_2d
 
-    def draw_2d_points(self, pts_2d, colors):
+    def draw_2d_points(self, pts_2d, colors, on_black = False):
         """ draw 2d points in camera image """
         assert pts_2d.shape[1] == 2, pts_2d.shape
 
-        image = self.frame.copy()
+        if on_black:
+            image = np.zeros_like(self.frame)
+        else:
+            image = self.frame.copy()
         pts = pts_2d.astype(np.int32).tolist()
 
         for (x,y),c in zip(pts, colors.tolist()):
