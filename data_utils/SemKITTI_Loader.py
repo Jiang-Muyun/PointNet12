@@ -5,6 +5,7 @@ import yaml
 import numpy as np
 import random
 from tqdm import tqdm
+import torch
 from torch.utils.data import Dataset
 import threading
 import multiprocessing 
@@ -279,10 +280,8 @@ class Semantic_KITTI_Utils():
         assert pts_3d.shape[1] == 3, pts_3d.shape
         pts_3d = pts_3d.copy()
         
-        # Create a [N,1] array
-        one_mat = np.ones((pts_3d.shape[0], 1),dtype=np.float32)
-
         # Concat and change shape from [N,3] to [N,4] to [4,N]
+        one_mat = np.ones((pts_3d.shape[0], 1),dtype=np.float32)
         xyz_v = np.concatenate((pts_3d, one_mat), axis=1).T
 
         # convert velodyne coordinates(X_v, Y_v, Z_v) to camera coordinates(X_c, Y_c, Z_c)
@@ -301,6 +300,36 @@ class Semantic_KITTI_Utils():
         # get pixels location
         pts_2d = xy_i[:2].T
         return pts_2d
+
+    def torch_project_3d_to_2d(self, pts_3d):
+        assert pts_3d.shape[1] == 3, pts_3d.shape
+        pts_3d = pts_3d.copy()
+        
+        # Create a [N,1] array
+        one_mat = np.ones((pts_3d.shape[0], 1),dtype=np.float32)
+        xyz_v = np.concatenate((pts_3d, one_mat), axis=1)
+
+        RT = torch.from_numpy(self.RT).float().cuda()
+        P = torch.from_numpy(self.P).float().cuda()
+        xyz_v = torch.from_numpy(xyz_v).float().cuda()
+
+        assert xyz_v.size(1) == 4, xyz_v.size()
+    
+        xyz_v = xyz_v.unsqueeze(2)
+        RT_rep = RT.expand(xyz_v.size(0),3,4)
+        P_rep = P.expand(xyz_v.size(0),3,3)
+
+        xyz_c = torch.bmm(RT_rep, xyz_v)
+        #log.info(xyz_c.shape, RT_rep.shape, xyz_v.shape)
+
+        xy_v = torch.bmm(P_rep, xyz_c)
+        #log.msg(xy_v.shape, P_rep.shape, xyz_c.shape)
+
+        xy_i = xy_v.squeeze(2).transpose(1,0)
+        xy_n = xy_i / xy_i[2]
+        pts_2d = (xy_n[:2]).transpose(1,0)
+
+        return pts_2d.detach().cpu().numpy()
 
     def draw_2d_points(self, pts_2d, colors, on_black = False):
         """ draw 2d points in camera image """
