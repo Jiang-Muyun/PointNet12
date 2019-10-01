@@ -73,17 +73,29 @@ sem_kitti_slim_mapping = {
     'traffic-sign': 'structure'   # 19
 }
 
-def toRedis(r, key, array):
-    assert len(array.shape) == 1
-    r.set(key, array.tobytes())
-    return
+class Numpy_Redis():
+    def __init__(self, host='127.0.0.1', port=6379, db=0):
+        self.handle = redis.Redis(host, port, db)
+        
+    def set(self, key, array):
+        assert len(array.shape) == 1, array.shape
+        self.handle.set(key, array.tobytes())
 
-def fromRedis(r, key):
-   encoded = r.get(key)
-   if encoded is None:
-       return None
-   array = np.frombuffer(encoded, dtype=np.float32, offset=0)
-   return array
+    def get(self, key, dtype = np.float32):
+        data = self.handle.get(key)
+        if data is None:
+            raise ValueError('%s not exist in Redis'%(key))
+        return np.frombuffer(data, dtype=dtype, offset=0)
+
+    def exists(self, key):
+        return bool(self.handle.execute_command('EXISTS ' + key))
+    
+    def ls_keys(self):
+        return self.handle.execute_command('KEYS *')
+    
+    def flush_all(self):
+        print('Del all keys in Redis')
+        return self.handle.execute_command('flushall')
 
 class Semantic_KITTI_Utils():
     def __init__(self, root, where = 'all', map_type = 'learning'):
@@ -354,35 +366,36 @@ class SemKITTI_Loader(Dataset):
         self.root = root
         self.train = train
         self.npoints = npoints
-        self.r = redis.Redis(host='127.0.0.1', port=6379, db=0)
+        self.np_redis = Numpy_Redis()
         self.utils = Semantic_KITTI_Utils(root,where,map_type)
 
         part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
 
         self.keys = []
+        alias = where[0] + map_type[0]
         for part in part_length.keys():
             length = part_length[part]
 
-            for part_index in range(length):
+            for index in range(length):
                 if self.train:
-                    if part_index > length * 0.3:
-                        self.keys.append('%s/%06d'%(part, part_index))
+                    if index > length * 0.3:
+                        self.keys.append('%s/%s/%06d'%(alias, part, index))
                 else:
-                    if part_index < length * 0.3:
-                        self.keys.append('%s/%06d'%(part, part_index))
+                    if index < length * 0.3:
+                        self.keys.append('%s/%s/%06d'%(alias, part, index))
 
     def __len__(self):
             return len(self.keys)
 
     def get_data(self, key):
-        if not redis.exists(key):
-            part, part_index = key.split('/')
-            pcd, label = self.utils.get(part, int(part_index))
+        if not np_redis.exists(key):
+            alias, part, index = key.split('/')
+            pcd, label = self.utils.get(part, int(index))
             to_store = np.concatenate((pcd, label.reshape((-1,1)).astype(np.float32)),axis=1).reshape((-1,))
-            toRedis(self.r, key, to_store)
-            print('add', key, pcd.shape, label.shape, len(np.unique(label)))
+            np_redis.set(key, to_store)
+            print('add', key, to_store.shape, to_store.dtype)
         else:
-            data = fromRedis(self.r, key)
+            data = np_redis.get(key)
             data = data.reshape((-1,5))
             pcd = data[:,:4]
             label = data[:,4].astype(np.int32)
