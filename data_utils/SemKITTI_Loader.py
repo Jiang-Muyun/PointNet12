@@ -388,14 +388,14 @@ class SemKITTI_Loader(Dataset):
             return len(self.keys)
 
     def get_data(self, key):
-        if not np_redis.exists(key):
+        if not self.np_redis.exists(key):
             alias, part, index = key.split('/')
             pcd, label = self.utils.get(part, int(index))
             to_store = np.concatenate((pcd, label.reshape((-1,1)).astype(np.float32)),axis=1).reshape((-1,))
-            np_redis.set(key, to_store)
+            self.np_redis.set(key, to_store)
             print('add', key, to_store.shape, to_store.dtype)
         else:
-            data = np_redis.get(key)
+            data = self.np_redis.get(key)
             data = data.reshape((-1,5))
             pcd = data[:,:4]
             label = data[:,4].astype(np.int32)
