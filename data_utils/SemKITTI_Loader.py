@@ -67,8 +67,8 @@ sem_kitti_slim_mapping = {
     'building':     'structure',  # 13
     'fence':        'structure',  # 14
     'vegetation':   'nature',     # 15
-    'trunk':        'nature',     # 16
-    'terrain':      'ground',     # 17
+    'trunk':        'nature',     # 16  # Tree Stems
+    'terrain':      'nature',     # 17  # Grass Field
     'pole':         'structure',  # 18
     'traffic-sign': 'structure'   # 19
 }

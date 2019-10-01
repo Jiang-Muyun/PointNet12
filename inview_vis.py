@@ -130,8 +130,8 @@ def vis(args):
         with log.Tick():
             with log.Tock('pre'):
                 point_cloud, label = kitti_utils.get(part, index, load_image=True)
+                pts_3d = point_cloud[:,:3]
                 pcd = pcd_normalize(point_cloud)
-
                 points = torch.from_numpy(pcd).unsqueeze(0)
                 points = points.transpose(2, 1).cuda()
 
@@ -145,15 +145,13 @@ def vis(args):
                     sem_label = pred_choice
 
                 print(index, pred_choice.shape, end='')
-                
-                pts_3d = point_cloud[:,:3]
-        
-            with log.Tock('disp'):
-                pts_2d = kitti_utils.project_3d_to_2d(pts_3d)
-                # pts_2d = kitti_utils.torch_project_3d_to_2d(pts_3d)
 
-            vis_handle.update(pts_3d, colors[pred_choice])
-            sem_img = kitti_utils.draw_2d_points(pts_2d, colors_bgr[pred_choice])
+            with log.Tock('disp'):
+                # pts_2d = kitti_utils.project_3d_to_2d(pts_3d)
+                pts_2d = kitti_utils.torch_project_3d_to_2d(pts_3d)
+
+                vis_handle.update(pts_3d, colors[pred_choice])
+                sem_img = kitti_utils.draw_2d_points(pts_2d, colors_bgr[pred_choice])
 
         cv2.imshow('semantic', sem_img)
         if 32 == cv2.waitKey(1):
