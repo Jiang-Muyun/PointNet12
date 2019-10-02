@@ -99,13 +99,7 @@ def test_kitti_semseg(model, loader, catdict, model_name, num_classes):
 
 def train(args):
     experiment_dir = mkdir('experiment/')
-    checkpoints_dir = mkdir('experiment/kitti_semseg/%s/'%(args.model_name))
-
-    # train_data, train_label, test_data, test_label = load_data(args.h5, train = True)
-    # dataset = SemKITTIDataLoader(train_data, train_label, npoints = 7000, data_augmentation = args.augment)
-    # dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
-    # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
-    # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+    checkpoints_dir = mkdir('experiment/inview/%s/'%(args.model_name))
     
     dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, where='inview', map_type = 'slim')
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
@@ -212,13 +206,9 @@ def train(args):
 def evaluate(args):
     if args.pretrain == None:
         if args.model_name == 'pointnet':
-            args.pretrain = 'checkpoints/inview-pointnet-0.51023-0052.pth'
+            args.pretrain = 'checkpoints/inview-pointnet-0.56354-0036.pth'
         else:
-            args.pretrain = 'checkpoints/inview-pointnet2-0.56290-0009.pth'
-
-    # _,_,test_data, test_label = load_data(args.h5, train = False)
-    # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)
-    # testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+            args.pretrain = 'checkpoints/inview-pointnet2-0.54945-0019.pth'
 
     test_dataset = SemKITTI_Loader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
     testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)

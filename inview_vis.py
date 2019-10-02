@@ -115,10 +115,11 @@ def vis(args):
     model = torch.nn.DataParallel(model)
     log.msg('Using gpu:',args.gpu)
 
-    if args.model_name == 'pointnet':
-        args.pretrain = 'checkpoints/inview-pointnet-0.51023-0052.pth'
-    else:
-        args.pretrain = 'checkpoints/inview-pointnet2-0.56290-0009.pth'
+    if args.pretrain == None:
+        if args.model_name == 'pointnet':
+            args.pretrain = 'checkpoints/inview-pointnet-0.56354-0036.pth'
+        else:
+            args.pretrain = 'checkpoints/inview-pointnet2-0.54945-0019.pth'
 
     assert args.pretrain is not None,'No pretrain model'
     checkpoint = torch.load(args.pretrain)
