@@ -8,10 +8,10 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset
 import threading
-import multiprocessing 
-import redis
-import struct
+import multiprocessing
 from PIL import Image
+
+from .redis_utils import Mat_Redis_Utils
 
 def pcd_jitter(pcd, sigma=0.01, clip=0.05):
     N, C = pcd.shape
@@ -26,6 +26,14 @@ def pcd_normalize(pcd):
     pcd[:,2] = pcd[:,2] / 3
     pcd[:,3] = (pcd[:,3] - 0.5)/2
     pcd = np.clip(pcd,-1,1)
+    return pcd
+
+def pcd_unnormalize(pcd):
+    pcd = pcd.copy()
+    pcd[:,0] = pcd[:,0] * 70
+    pcd[:,1] = pcd[:,1] * 70
+    pcd[:,2] = pcd[:,2] * 3
+    pcd[:,3] = pcd[:,3] * 2 + 0.5
     return pcd
 
 class_names = [
@@ -73,49 +81,6 @@ sem_kitti_slim_mapping = {
     'pole':         'structure',  # 18
     'traffic-sign': 'structure'   # 19
 }
-
-
-class Mat_Redis_Utils():
-    def __init__(self, host='127.0.0.1', port=6379, db=0):
-        self.handle = redis.Redis(host, port, db)
-        self.dtype_table = [
-            np.int8,np.int16,np.int32,np.int64,
-            np.uint8,np.uint16,np.uint32,np.uint64,
-            np.float16,np.float32,np.float64
-        ]
-    
-    def mat_to_bytes(self, arr):
-        dtype_id = self.dtype_table.index(arr.dtype)
-        header = struct.pack('>'+'I' * (2+arr.ndim), dtype_id, arr.ndim, *arr.shape)
-        data = header + arr.tobytes()
-        return data
-
-    def bytes_to_mat(self, data):
-        dtype_id, ndim = struct.unpack('>II',data[:8])
-        dtype = self.dtype_table[dtype_id]
-        shape = struct.unpack('>'+'I'*ndim, data[8:4*(2+ndim)])
-        arr = np.frombuffer(data[4*(2+ndim):], dtype=dtype, offset=0)
-        arr = arr.reshape((shape))
-        return arr
-        
-    def set(self, key, arr):
-        return self.handle.set(key, self.mat_to_bytes(arr))
-
-    def get(self, key, dtype = np.float32):
-        data = self.handle.get(key)
-        if data is None:
-            raise ValueError('%s not exist in Redis'%(key))
-        return self.bytes_to_mat(data)
-
-    def exists(self, key):
-        return bool(self.handle.execute_command('EXISTS ' + key))
-    
-    def ls_keys(self):
-        return self.handle.execute_command('KEYS *')
-    
-    def flush_all(self):
-        print('Del all keys in Redis')
-        return self.handle.execute_command('flushall')
 
     
 class Semantic_KITTI_Utils():
@@ -397,7 +362,7 @@ class SemKITTI_Loader(Dataset):
         for part in part_length.keys():
             length = part_length[part]
 
-            for index in range(length):
+            for index in range(0,length,2):
                 if self.train:
                     if index > length * 0.3:
                         self.keys.append('%s/%s/%06d'%(alias, part, index))
@@ -411,7 +376,8 @@ class SemKITTI_Loader(Dataset):
     def get_data(self, key):
         if not self.np_redis.exists(key):
             alias, part, index = key.split('/')
-            pcd, label = self.utils.get(part, int(index))
+            point_cloud, label = self.utils.get(part, int(index))
+            pcd = pcd_normalize(point_cloud)
             to_store = np.concatenate((pcd, label.reshape((-1,1)).astype(np.float32)),axis=1)
             self.np_redis.set(key, to_store)
             print('add', key, to_store.shape, to_store.dtype)
@@ -419,7 +385,6 @@ class SemKITTI_Loader(Dataset):
             data = self.np_redis.get(key)
             pcd = data[:,:4]
             label = data[:,4].astype(np.int32)
-
         return pcd, label
 
     def __getitem__(self, index):
