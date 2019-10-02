@@ -210,10 +210,11 @@ def train(args):
         log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)
 
 def evaluate(args):
-    if args.model_name == 'pointnet':
-        args.pretrain = 'checkpoints/inview-pointnet-0.51023-0052.pth'
-    else:
-        args.pretrain = 'checkpoints/inview-pointnet2-0.56290-0009.pth'
+    if args.pretrain == None:
+        if args.model_name == 'pointnet':
+            args.pretrain = 'checkpoints/inview-pointnet-0.51023-0052.pth'
+        else:
+            args.pretrain = 'checkpoints/inview-pointnet2-0.56290-0009.pth'
 
     # _,_,test_data, test_label = load_data(args.h5, train = False)
     # test_dataset = SemKITTIDataLoader(test_data, test_label, npoints = 13072)

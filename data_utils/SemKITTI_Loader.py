@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 import threading
 import multiprocessing 
 import redis
+import struct
 from PIL import Image
 
 def pcd_jitter(pcd, sigma=0.01, clip=0.05):
@@ -73,19 +74,38 @@ sem_kitti_slim_mapping = {
     'traffic-sign': 'structure'   # 19
 }
 
-class Numpy_Redis():
+
+class Mat_Redis_Utils():
     def __init__(self, host='127.0.0.1', port=6379, db=0):
         self.handle = redis.Redis(host, port, db)
+        self.dtype_table = [
+            np.int8,np.int16,np.int32,np.int64,
+            np.uint8,np.uint16,np.uint32,np.uint64,
+            np.float16,np.float32,np.float64
+        ]
+    
+    def mat_to_bytes(self, arr):
+        dtype_id = self.dtype_table.index(arr.dtype)
+        header = struct.pack('>'+'I' * (2+arr.ndim), dtype_id, arr.ndim, *arr.shape)
+        data = header + arr.tobytes()
+        return data
+
+    def bytes_to_mat(self, data):
+        dtype_id, ndim = struct.unpack('>II',data[:8])
+        dtype = self.dtype_table[dtype_id]
+        shape = struct.unpack('>'+'I'*ndim, data[8:4*(2+ndim)])
+        arr = np.frombuffer(data[4*(2+ndim):], dtype=dtype, offset=0)
+        arr = arr.reshape((shape))
+        return arr
         
-    def set(self, key, array):
-        assert len(array.shape) == 1, array.shape
-        self.handle.set(key, array.tobytes())
+    def set(self, key, arr):
+        return self.handle.set(key, self.mat_to_bytes(arr))
 
     def get(self, key, dtype = np.float32):
         data = self.handle.get(key)
         if data is None:
             raise ValueError('%s not exist in Redis'%(key))
-        return np.frombuffer(data, dtype=dtype, offset=0)
+        return self.bytes_to_mat(data)
 
     def exists(self, key):
         return bool(self.handle.execute_command('EXISTS ' + key))
@@ -97,6 +117,7 @@ class Numpy_Redis():
         print('Del all keys in Redis')
         return self.handle.execute_command('flushall')
 
+    
 class Semantic_KITTI_Utils():
     def __init__(self, root, where = 'all', map_type = 'learning'):
         self.root = root
@@ -366,7 +387,7 @@ class SemKITTI_Loader(Dataset):
         self.root = root
         self.train = train
         self.npoints = npoints
-        self.np_redis = Numpy_Redis()
+        self.np_redis = Mat_Redis_Utils()
         self.utils = Semantic_KITTI_Utils(root,where,map_type)
 
         part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
@@ -391,12 +412,11 @@ class SemKITTI_Loader(Dataset):
         if not self.np_redis.exists(key):
             alias, part, index = key.split('/')
             pcd, label = self.utils.get(part, int(index))
-            to_store = np.concatenate((pcd, label.reshape((-1,1)).astype(np.float32)),axis=1).reshape((-1,))
+            to_store = np.concatenate((pcd, label.reshape((-1,1)).astype(np.float32)),axis=1)
             self.np_redis.set(key, to_store)
             print('add', key, to_store.shape, to_store.dtype)
         else:
             data = self.np_redis.get(key)
-            data = data.reshape((-1,5))
             pcd = data[:,:4]
             label = data[:,4].astype(np.int32)
 
