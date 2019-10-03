@@ -23,22 +23,16 @@ from utils import mkdir, select_avaliable
 from data_utils.SemKITTI_Loader import pcd_normalize, Semantic_KITTI_Utils, SemKITTI_Loader
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
-kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'slim')
-num_classes = kitti_utils.num_classes
-class_names = kitti_utils.class_names
-index_to_name = kitti_utils.index_to_name
-colors = kitti_utils.colors
-colors_bgr = kitti_utils.colors_bgr
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
-    parser.add_argument('--model_name', type=str, default='pointnet', help='pointnet or pointnet2')
+    parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'), help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
+    parser.add_argument('--map', type=str, default='slim', choices=('slim', 'learning'), help='slim(6) or learning(20)')
     parser.add_argument('--workers', type=int, default=6, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
-    parser.add_argument('--h5', type=str, default = 'experiment/data/pts_sem_voxel_0.10.h5', help='pts h5 file')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate for training')
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
@@ -101,11 +95,15 @@ def train(args):
     experiment_dir = mkdir('experiment/')
     checkpoints_dir = mkdir('experiment/inview/%s/'%(args.model_name))
     
-    dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, where='inview', map_type = 'slim')
+    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = args.map)
+    num_classes = kitti_utils.num_classes
+    index_to_name = kitti_utils.index_to_name
+
+    dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, where='inview', map_type = args.map)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, where='inview', map_type = args.map)
+    testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
 
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
@@ -142,7 +140,7 @@ def train(args):
 
     for epoch in range(init_epoch,args.epoch):
         lr = calc_decay(args.learning_rate, epoch)
-        log.info(job='inview',model=args.model_name,gpu=args.gpu, epoch=epoch, lr=lr)
+        log.info(job='inview_'+args.map, model=args.model_name,gpu=args.gpu, epoch=epoch, lr=lr)
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -154,7 +152,7 @@ def train(args):
             points, target = points.cuda(), target.cuda()
             optimizer.zero_grad()
             model = model.train()
-
+            
             if args.model_name == 'pointnet':
                 pred, trans_feat = model(points)
             else:
@@ -192,7 +190,7 @@ def train(args):
             save_model = True
         
         if save_model:
-            fn_pth = 'inview-%s-%.5f-%04d.pth' % (args.model_name, best_meaniou, epoch)
+            fn_pth = 'inview-%s-%s-%.5f-%04d.pth' % (args.model_name, args.map, best_meaniou, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
             log.msg(cat_mean_iou)
@@ -204,14 +202,12 @@ def train(args):
         log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)
 
 def evaluate(args):
-    if args.pretrain == None:
-        if args.model_name == 'pointnet':
-            args.pretrain = 'checkpoints/inview-pointnet-0.56354-0036.pth'
-        else:
-            args.pretrain = 'checkpoints/inview-pointnet2-0.54945-0019.pth'
+    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = args.map)
+    num_classes = kitti_utils.num_classes
+    index_to_name = kitti_utils.index_to_name
 
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 15000, train=False, where='inview', map_type = 'slim')
-    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, where='inview', map_type = args.map)
+    testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
 
     log.msg('Building Model', model_name = args.model_name)
     if args.model_name == 'pointnet':

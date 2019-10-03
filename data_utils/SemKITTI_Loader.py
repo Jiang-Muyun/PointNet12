@@ -24,7 +24,7 @@ def pcd_normalize(pcd):
     pcd[:,0] = pcd[:,0] / 70
     pcd[:,1] = pcd[:,1] / 70
     pcd[:,2] = pcd[:,2] / 3
-    pcd[:,3] = (pcd[:,3] - 0.5)/2
+    pcd[:,3] = (pcd[:,3] - 0.5)*2
     pcd = np.clip(pcd,-1,1)
     return pcd
 
@@ -33,7 +33,7 @@ def pcd_unnormalize(pcd):
     pcd[:,0] = pcd[:,0] * 70
     pcd[:,1] = pcd[:,1] * 70
     pcd[:,2] = pcd[:,2] * 3
-    pcd[:,3] = pcd[:,3] * 2 + 0.5
+    pcd[:,3] = pcd[:,3] / 2 + 0.5
     return pcd
 
 class_names = [
@@ -377,18 +377,21 @@ class SemKITTI_Loader(Dataset):
         if not self.np_redis.exists(key):
             alias, part, index = key.split('/')
             point_cloud, label = self.utils.get(part, int(index))
-            pcd = pcd_normalize(point_cloud)
-            to_store = np.concatenate((pcd, label.reshape((-1,1)).astype(np.float32)),axis=1)
+            to_store = np.concatenate((point_cloud, label.reshape((-1,1)).astype(np.float32)),axis=1)
             self.np_redis.set(key, to_store)
             print('add', key, to_store.shape, to_store.dtype)
         else:
             data = self.np_redis.get(key)
-            pcd = data[:,:4]
+            point_cloud = data[:,:4]
             label = data[:,4].astype(np.int32)
-        return pcd, label
+        
+        # Unnormalized Point cloud
+        return point_cloud, label
 
     def __getitem__(self, index):
-        pcd, label = self.get_data(self.keys[index])
+        point_cloud, label = self.get_data(self.keys[index])
+        #pcd = point_cloud
+        pcd = pcd_normalize(point_cloud)
         if self.train:
             pcd = pcd_jitter(pcd)
 
