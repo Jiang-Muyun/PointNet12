@@ -1,6 +1,8 @@
 import redis
 import numpy as np
 import struct
+from PIL import Image
+import io
 
 class Mat_Redis_Utils():
     def __init__(self, host='127.0.0.1', port=6379, db=0):
@@ -34,6 +36,15 @@ class Mat_Redis_Utils():
             raise ValueError('%s not exist in Redis'%(key))
         return self.bytes_to_mat(data)
 
+    def set_PIL(self, key, fn):
+        return self.handle.set(key, open(fn, "rb").read())
+
+    def get_PIL(self, key):
+        data = self.handle.get(key)
+        if data is None:
+            raise ValueError('%s not exist in Redis'%(key))
+        return Image.open(io.BytesIO(data))
+    
     def exists(self, key):
         return bool(self.handle.execute_command('EXISTS ' + key))
     
