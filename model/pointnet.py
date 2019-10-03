@@ -75,8 +75,8 @@ class STNkd(nn.Module):
         x = F.relu(self.bn5(self.fc2(x)))
         x = self.fc3(x)
 
-        iden = Variable(torch.from_numpy(np.eye(self.k).flatten().astype(np.float32))).view(1, self.k * self.k).repeat(
-            batchsize, 1)
+        eye_mat = np.eye(self.k).flatten().astype(np.float32)
+        iden = Variable(torch.from_numpy(eye_mat)).view(1, self.k * self.k).repeat(batchsize, 1)
         if x.is_cuda:
             iden = iden.cuda()
         x = x + iden
@@ -99,6 +99,7 @@ class PointNetEncoder(nn.Module):
             self.fstn = STNkd(k=64)
 
     def forward(self, x):
+        # x -> [batch, channels, n_pts]
         n_pts = x.size()[2]
         trans = self.stn(x)
         x = x.transpose(2, 1)
@@ -117,12 +118,16 @@ class PointNetEncoder(nn.Module):
         pointfeat = x
         x = F.relu(self.bn2(self.conv2(x)))
         x = self.bn3(self.conv3(x))
+        #print('before max', x.shape)
         x = torch.max(x, 2, keepdim=True)[0]
         x = x.view(-1, 1024)
+        #print('after max', x.shape)
         if self.global_feat:
             return x, trans, trans_feat
         else:
             x = x.view(-1, 1024, 1).repeat(1, 1, n_pts)
+            #print('before return', x.shape, pointfeat.shape)
+            #print('return', torch.cat([x, pointfeat], 1).shape)
             return torch.cat([x, pointfeat], 1), trans, trans_feat
 
 class PointNetCls(nn.Module):
@@ -245,8 +250,10 @@ class PointNetSeg(nn.Module):
         x = F.relu(self.bn3(self.conv3(x)))
         x = self.conv4(x)
         x = x.transpose(2,1).contiguous()
+        # print('before log_softmax', x.shape, x.min(), x.max())
         x = F.log_softmax(x.view(-1,self.k), dim=-1)
         x = x.view(batchsize, n_pts, self.k)
+        # print('after log_softmax', x.shape, x.min(), x.max())
         return x, trans_feat
 
 
@@ -274,10 +281,9 @@ class PointNetLoss(torch.nn.Module):
 
 
 if __name__ == '__main__':
-    point = torch.randn(8,3,1024)
-    label = torch.randn(8,16)
-    model = PointNetDenseCls()
-    net, net2, trans_feat = model(point,label)
-    print('net',net.shape)
-    print('net2',net2.shape)
-    print('trans_feat',trans_feat.shape)
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+    points = torch.randn(2,4,7000)
+    model = PointNetSeg(20, input_dims = 4, feature_transform=True)
+    pred, trans_feat = model(points)
+    print(pred.shape,trans_feat.shape)
