@@ -26,7 +26,7 @@ from inview_seg import parse_args
 from data_utils.SemKITTI_Loader import pcd_normalize, Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
-kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'learning')
+
 
 class Window_Manager():
     def __init__(self):
@@ -98,22 +98,26 @@ def export_video():
     out.release()
 
 def vis(args):
-    part = '03'
+    part = '01'
+    args.subset ='inview'
     args.map = 'learning'
     args.model_name = 'pointnet'
 
+    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
+
     vis_handle = Window_Manager()
     if args.model_name == 'pointnet':
-        args.pretrain = 'checkpoints/inview-pointnet-learning-0.54916-0063.pth'
+        args.pretrain = 'checkpoints/pointnet-inview-learning-0.52692-0024.pth'
     else:
         args.pretrain = 'checkpoints/inview-pointnet2-learning-0.56718-0007.pth'
 
     model = load_pointnet(args.model_name, kitti_utils.num_classes, args.pretrain)
 
-    for index in range(160, kitti_utils.get_max_index(part)):
+    for index in range(0, kitti_utils.get_max_index(part)):
+        point_cloud, label = kitti_utils.get(part, index, load_image=True)
         with log.Tick():
             with log.Tock('pre'):
-                point_cloud, label = kitti_utils.get(part, index, load_image=True)
+                point_cloud = point_cloud[:22000]
                 pts_3d = point_cloud[:,:3]
                 pcd = pcd_normalize(point_cloud)
                 points = torch.from_numpy(pcd).unsqueeze(0)
@@ -134,10 +138,11 @@ def vis(args):
                 # pts_2d = kitti_utils.project_3d_to_2d(pts_3d)
                 pts_2d = kitti_utils.torch_project_3d_to_2d(pts_3d)
 
-                vis_handle.update(pts_3d, kitti_utils.colors[pred_choice])
-                sem_img = kitti_utils.draw_2d_points(pts_2d, kitti_utils.colors_bgr[pred_choice])
+        vis_handle.update(pts_3d, kitti_utils.colors[pred_choice])
+        sem_img = kitti_utils.draw_2d_points(pts_2d, kitti_utils.colors_bgr[pred_choice])
 
         cv2.imshow('semantic', sem_img)
+        cv2.imshow('frame', cv2.cvtColor(kitti_utils.frame,cv2.COLOR_BGR2RGB))
         if 32 == cv2.waitKey(1):
             break
 
