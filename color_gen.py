@@ -16,12 +16,12 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 import my_log as log
 
-from model.pointnet import PointNetSeg, feature_transform_reguliarzer
+from model.pointnet import PointNetColorGen, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 from model.utils import load_pointnet
 
 from utils import mkdir, select_avaliable
-from data_utils.SemKITTI_Loader import Semantic_KITTI_Utils, SemKITTI_Loader
+from data_utils.SemKITTI_Loader import Semantic_KITTI_Utils, ColorGeneratorLoader
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 
@@ -91,11 +91,10 @@ def test_kitti_semseg(model, loader, model_name, num_classes, class_names):
 
 def train(args):
     experiment_dir = mkdir('experiment/')
-    checkpoints_dir = mkdir('experiment/inview/%s/'%(args.model_name))
+    checkpoints_dir = mkdir('experiment/color_gen/%s/'%(args.model_name))
     
     kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
-    class_names = kitti_utils.class_names
-    num_classes = kitti_utils.num_classes
+    num_classes = 3
 
     dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, subset=args.subset, map_type = args.map)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
@@ -188,24 +187,9 @@ def train(args):
         log.warn('Curr',accuracy=acc, mIOU=miou)
         log.warn('Best',accuracy=best_acc, mIOU=best_miou)
 
-def evaluate(args):
-    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
-    class_names = kitti_utils.class_names
-    num_classes = kitti_utils.num_classes
-
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset, map_type = args.map)
-    testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
-
-    model = load_pointnet(args.model_name, kitti_utils.num_classes, args.pretrain)
-
-    acc, miou = test_kitti_semseg(model.eval(), testdataloader,args.model_name,num_classes,class_names)
-
-    log.info('Curr', accuracy=acc, mIOU=miou)
 
 if __name__ == '__main__':
     args = parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.mode == "train":
         train(args)
-    if args.mode == "eval":
-        evaluate(args)

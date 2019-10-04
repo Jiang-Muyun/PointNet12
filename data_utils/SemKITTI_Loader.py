@@ -172,9 +172,9 @@ class Semantic_KITTI_Utils():
         if load_image:
             fn_frame = os.path.join(sequence_root, 'image_2/%06d.png' % (index))
             assert os.path.exists(fn_frame), 'Broken dataset %s' % (fn_frame)
-            # self.frame = cv2.imread(fn_frame)
-            self.frame_PIL = Image.open(fn_frame)
-            self.frame = np.array(self.frame_PIL)
+            self.frame_BGR = cv2.imread(fn_frame)
+            self.frame = cv2.cvtColor(self.frame_BGR, cv2.COLOR_BGR2RGB)
+            self.frame_HSV = cv2.cvtColor(self.frame_BGR, cv2.COLOR_BGR2HSV)
 
         fn_velo = os.path.join(sequence_root, 'velodyne/%06d.bin' %(index))
         fn_label = os.path.join(sequence_root, 'labels/%06d.label' %(index))
@@ -427,18 +427,79 @@ class SemKITTI_Loader(Dataset):
             label = np.concatenate((label,label[0:rows_short]),axis=0)
         return pcd, label
 
-if __name__ == "__main__":
-    from torch.utils.data import DataLoader
-    root = os.environ['KITTI_ROOT']
+class ColorGeneratorLoader(Dataset):
+    def __init__(self, root, npoints, train = True):
+        self.root = root
+        self.train = train
+        self.npoints = npoints
+        self.np_redis = Mat_Redis_Utils()
+        self.utils = Semantic_KITTI_Utils(root,'inview','learning')
 
-    dataset = Full_SemKITTILoader(root, 7000, train=True, subset='all', map_type = 'learning')
-    dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=6)
-    
-    test_dataset = Full_SemKITTILoader(root, 13000, train=False, subset='all', map_type = 'learning')
-    testdataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=6)
+        part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,
+            '06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
 
-    for i in range(2):
-        for data in tqdm(dataloader, 0,total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
+        self.keys = []
+        alias = 'gen'
+        
+        if self.train:
+            for part in ['03']:
+                length = part_length[part]
+                for index in range(0,length,2):
+                    self.keys.append('%s/%s/%06d'%(alias, part, index))
+        else:
+            for part in ['03']:
+                length = part_length[part]
+                for index in range(0,length,2):
+                    self.keys.append('%s/%s/%06d'%(alias, part, index))
+
+    def __len__(self):
+            return len(self.keys)
+
+    def get_data(self, key):
+        if not self.np_redis.exists(key):
+            alias, part, index = key.split('/')
+
+            point_cloud, label = self.utils.get(part, int(index), load_image = True)
+            pts_2d = self.utils.torch_project_3d_to_2d(point_cloud[:,:3]).astype(np.int32)
+            pts_color = np.zeros((point_cloud.shape[0],3), dtype=np.float32)
+
+            frame_shape = self.utils.frame.shape
+            for i,(y,x) in enumerate(pts_2d):
+                if x >= 0 and x < frame_shape[0] and y >= 0 and y < frame_shape[1]:
+                    pts_color[i] = self.utils.frame_HSV[x,y]
+            # img = self.utils.draw_2d_points(pts_2d, pts_color, on_black=True)
+            # plt.imshow(cv2.cvtColor(img, cv2.COLOR_HSV2RGB))
+            pts_color[:,0] /= 180
+            pts_color[:,1:] /= 255
+
+            to_store = np.concatenate((point_cloud, pts_color),axis=1)
+            self.np_redis.set(key, to_store)
+            print('add', key, to_store.shape, to_store.dtype)
+        else:
+            data = self.np_redis.get(key)
+            point_cloud = data[:,:4]
+            label = data[:,4:]
+        
+        # Unnormalized Point cloud
+        return point_cloud, label
+
+    def __getitem__(self, index):
+        point_cloud, label = self.get_data(self.keys[index])
+        #pcd = point_cloud
+        pcd = pcd_normalize(point_cloud)
+        if self.train:
+            pcd = pcd_jitter(pcd)
+
+        length = pcd.shape[0]
+        if length == self.npoints:
             pass
-        for data in testdataloader:
-            pass
+        elif length > self.npoints:
+            start_idx = np.random.randint(0, length - self.npoints)
+            end_idx = start_idx + self.npoints
+            pcd = pcd[start_idx:end_idx]
+            label = label[start_idx:end_idx]
+        else:
+            rows_short = self.npoints - length
+            pcd = np.concatenate((pcd,pcd[0:rows_short]),axis=0)
+            label = np.concatenate((label,label[0:rows_short]),axis=0)
+        return pcd, label
