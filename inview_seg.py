@@ -18,6 +18,7 @@ import my_log as log
 
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
+from model.utils import load_pointnet
 
 from utils import mkdir, select_avaliable
 from data_utils.SemKITTI_Loader import pcd_normalize, Semantic_KITTI_Utils, SemKITTI_Loader
@@ -26,10 +27,11 @@ KITTI_ROOT = os.environ['KITTI_ROOT']
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
-    parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'), help='pointnet or pointnet2')
+    parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'))
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
-    parser.add_argument('--map', type=str, default='learning', choices=('slim', 'learning'), help='slim(6) or learning(20)')
+    parser.add_argument('--map', type=str, default='learning', choices=('slim', 'learning'))
+    parser.add_argument('--subset', type=str, default='inview', choices=('inview', 'all'))
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')
@@ -45,64 +47,60 @@ def parse_args(notebook = False):
 def calc_decay(init_lr, epoch):
     return init_lr * 1/(1 + 0.03*epoch)
 
-def calc_categorical_iou(pred, target, num_classes ,iou_tabel):
-    choice = pred.max(-1)[1]
-    target.squeeze_(-1)
-    for cat in range(1,num_classes):
-        I = torch.sum((choice == cat) & (target == cat)).float()
-        U = torch.sum((choice == cat) | (target == cat)).float()
-        if U == 0:
-            iou = 1
-        else:
-            iou = (I / U).cpu().item()
-        iou_tabel[cat,0] += iou
-        iou_tabel[cat,1] += 1
-    return iou_tabel
-
-def test_kitti_semseg(model, loader, catdict, model_name, num_classes):
-    iou_tabel = np.zeros((len(catdict),3))
-    metrics = {'accuracy':[]}
+def test_kitti_semseg(model, loader, model_name, num_classes, class_names):
+    ious = np.zeros((num_classes,), dtype = np.float32)
+    count = np.zeros((num_classes,), dtype = np.uint32)
+    count[0] = 1
+    accuracy = []
     
     for points, target in tqdm(loader, total=len(loader), smoothing=0.9, dynamic_ncols=True):
         batch_size, num_point, _ = points.size()
-        points, target = points.float(), target.long()
-        points = points.transpose(2, 1)
-        points, target = points.cuda(), target.cuda()
+        points = points.float().transpose(2, 1).cuda()
+        target = target.long().cuda()
+
         with torch.no_grad():
             if model_name == 'pointnet':
                 pred, _ = model(points)
             else:
                 pred = model(points)
 
-        iou_tabel = calc_categorical_iou(pred,target,num_classes,iou_tabel)
-        
-        target.squeeze_(-1)
-        pred_choice = pred.data.max(-1)[1]
-        correct = (pred_choice == target.data).sum().cpu().item()
-        metrics['accuracy'].append(correct/ (batch_size * num_point))
+            pred_choice = pred.argmax(-1)
+            target = target.squeeze(-1)
 
-    iou_tabel[:,2] = iou_tabel[:,0] /iou_tabel[:,1]
-    metrics['accuracy'] = np.mean(metrics['accuracy'])
-    metrics['iou'] = np.mean(iou_tabel[:, 2])
+            for class_id in range(1,num_classes):
+                I = torch.sum((pred_choice == class_id) & (target == class_id)).cpu().item()
+                U = torch.sum((pred_choice == class_id) | (target == class_id)).cpu().item()
+                iou = 1 if U == 0 else I/U
+                ious[class_id] += iou
+                count[class_id] += 1
 
-    iou_tabel = pd.DataFrame(iou_tabel,columns=['iou','count','mean_iou'])
-    iou_tabel['Category_IOU'] = [catdict[i] for i in range(len(catdict)) ]
-    cat_iou = iou_tabel.groupby('Category_IOU')['mean_iou'].mean()
+            correct = (pred_choice == target).sum().cpu().item()
+            accuracy.append(correct/ (batch_size * num_point)) 
 
-    return metrics, cat_iou
+    categorical_iou = ious / count
+    df = pd.DataFrame(categorical_iou, columns=['mIOU'], index=class_names)
+    df = df.sort_values(by='mIOU', ascending=False)
+
+    log.info('categorical mIOU')
+    log.msg(df)
+    log.info('Overall mIOU does not include unlabelled class')
+
+    acc = np.mean(accuracy)
+    miou = np.mean(categorical_iou[1:])
+    return acc, miou
 
 def train(args):
     experiment_dir = mkdir('experiment/')
     checkpoints_dir = mkdir('experiment/inview/%s/'%(args.model_name))
     
-    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = args.map)
+    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
+    class_names = kitti_utils.class_names
     num_classes = kitti_utils.num_classes
-    index_to_name = kitti_utils.index_to_name
 
-    dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, where='inview', map_type = args.map)
+    dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, subset=args.subset, map_type = args.map)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, where='inview', map_type = args.map)
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset, map_type = args.map)
     testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
 
     if args.model_name == 'pointnet':
@@ -134,9 +132,8 @@ def train(args):
         log.msg('Training from scratch')
         init_epoch = 0
 
-    history = {'loss':[]}
     best_acc = 0
-    best_meaniou = 0
+    best_miou = 0
 
     for epoch in range(init_epoch,args.epoch):
         lr = calc_decay(args.learning_rate, epoch)
@@ -165,76 +162,45 @@ def train(args):
             if args.model_name == 'pointnet':
                 loss += feature_transform_reguliarzer(trans_feat) * 0.001
 
-            history['loss'].append(loss.cpu().data.numpy())
             loss.backward()
             optimizer.step()
         
         log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
-        test_metrics, cat_mean_iou = test_kitti_semseg(
-            model.eval(), 
-            testdataloader,
-            index_to_name,
-            args.model_name,
-            num_classes = num_classes,
-        )
-        mean_iou = np.mean(cat_mean_iou)
+        acc, miou = test_kitti_semseg(model.eval(), testdataloader,args.model_name,num_classes,class_names)
 
         save_model = False
-        if test_metrics['accuracy'] > best_acc:
-            best_acc = test_metrics['accuracy']
+        if acc > best_acc:
+            best_acc = acc
         
-        if mean_iou > best_meaniou:
-            best_meaniou = mean_iou
+        if miou > best_miou:
+            best_miou = miou
             save_model = True
         
         if save_model:
-            fn_pth = 'inview-%s-%s-%.5f-%04d.pth' % (args.model_name, args.map, best_meaniou, epoch)
+            fn_pth = '%s-%s-%s-%.5f-%04d.pth' % (args.model_name, args.subset, args.map, best_miou, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
-            log.msg(cat_mean_iou)
         else:
             log.info('No need to save model')
-            log.msg(cat_mean_iou)
 
-        log.warn('Curr',accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
-        log.warn('Best',accuracy=best_acc, meanIOU=best_meaniou)
+        log.warn('Curr',accuracy=acc, mIOU=miou)
+        log.warn('Best',accuracy=best_acc, mIOU=best_miou)
 
 def evaluate(args):
-    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = args.map)
+    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
+    class_names = kitti_utils.class_names
     num_classes = kitti_utils.num_classes
-    index_to_name = kitti_utils.index_to_name
 
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, where='inview', map_type = args.map)
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset, map_type = args.map)
     testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
 
-    log.msg('Building Model', model_name = args.model_name)
-    if args.model_name == 'pointnet':
-        model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
-    else:
-        model = PointNet2SemSeg(num_classes, feature_dims = 1)
+    model = load_pointnet(args.model_name, kitti_utils.num_classes, args.pretrain)
 
-    torch.backends.cudnn.benchmark = True
-    model = torch.nn.DataParallel(model)
-    log.msg('Using gpu:',gpu = args.gpu)
+    acc, miou = test_kitti_semseg(model.eval(), testdataloader,args.model_name,num_classes,class_names)
 
-    assert args.pretrain is not None,'No pretrain model'
-    checkpoint = torch.load(args.pretrain)
-    model.load_state_dict(checkpoint)
-    model.cuda()
-
-    test_metrics, cat_mean_iou = test_kitti_semseg(
-        model.eval(), 
-        testdataloader,
-        index_to_name,
-        args.model_name,
-        num_classes = num_classes,
-    )
-    
-    mean_iou = np.mean(cat_mean_iou)
-    log.warn(cat_mean_iou)
-    log.info('Curr', accuracy=test_metrics['accuracy'], meanIOU=mean_iou)
+    log.info('Curr', accuracy=acc, mIOU=miou)
 
 if __name__ == '__main__':
     args = parse_args()

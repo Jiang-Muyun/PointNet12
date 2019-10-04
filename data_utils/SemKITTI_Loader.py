@@ -91,7 +91,7 @@ sem_kitti_to_kitti = {
 
     
 class Semantic_KITTI_Utils():
-    def __init__(self, root, where = 'all', map_type = 'learning'):
+    def __init__(self, root, subset = 'all', map_type = 'learning'):
         self.root = root
 
         base_path = os.path.dirname(os.path.realpath(__file__)) + '/../'
@@ -112,10 +112,10 @@ class Semantic_KITTI_Utils():
             '00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,
             '06':1100,'07':1100,'08':4070,'09':1590,'10':1200
         }
-        assert where in ['all', 'inview'], where
+        assert subset in ['all', 'inview'], subset
         assert map_type in ['learning','slim'], map_type
 
-        self.where = where
+        self.subset = subset
         self.map_type = map_type
 
         # colors = [[0, 0, 0],
@@ -193,7 +193,7 @@ class Semantic_KITTI_Utils():
             print("Label shape: ", label.shape)
             raise ValueError("Scan and Label don't contain same number of points")
 
-        if self.where == 'inview':
+        if self.subset == 'inview':
             self.set_filter([-40, 40], [-20, 20])
             combined = self.points_basic_filter(points)
             points = points[combined]
@@ -364,27 +364,29 @@ class Semantic_KITTI_Utils():
         return self.length[part]
 
 class SemKITTI_Loader(Dataset):
-    def __init__(self, root, npoints, train = True, where = 'all', map_type = 'learning'):
+    def __init__(self, root, npoints, train = True, subset = 'all', map_type = 'learning'):
         self.root = root
         self.train = train
         self.npoints = npoints
         self.np_redis = Mat_Redis_Utils()
-        self.utils = Semantic_KITTI_Utils(root,where,map_type)
+        self.utils = Semantic_KITTI_Utils(root,subset,map_type)
 
-        part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,'06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
+        part_length = {'00': 4540,'01':1100,'02':4660,'03':800,'04':270,'05':2760,
+            '06':1100,'07':1100,'08':4070,'09':1590,'10':1200}
 
         self.keys = []
-        alias = where[0] + map_type[0]
-        for part in part_length.keys():
-            length = part_length[part]
-
-            for index in range(0,length,2):
-                if self.train:
-                    if index > length * 0.3:
-                        self.keys.append('%s/%s/%06d'%(alias, part, index))
-                else:
-                    if index < length * 0.3:
-                        self.keys.append('%s/%s/%06d'%(alias, part, index))
+        alias = subset[0] + map_type[0]
+        
+        if self.train:
+            for part in ['00','01','02','03','04','05','06','07','09','10']:
+                length = part_length[part]
+                for index in range(0,length,2):
+                    self.keys.append('%s/%s/%06d'%(alias, part, index))
+        else:
+            for part in ['08']:
+                length = part_length[part]
+                for index in range(0,length,2):
+                    self.keys.append('%s/%s/%06d'%(alias, part, index))
 
     def __len__(self):
             return len(self.keys)
@@ -429,10 +431,10 @@ if __name__ == "__main__":
     from torch.utils.data import DataLoader
     root = os.environ['KITTI_ROOT']
 
-    dataset = Full_SemKITTILoader(root, 7000, train=True, where='all', map_type = 'learning')
+    dataset = Full_SemKITTILoader(root, 7000, train=True, subset='all', map_type = 'learning')
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=6)
     
-    test_dataset = Full_SemKITTILoader(root, 13000, train=False, where='all', map_type = 'learning')
+    test_dataset = Full_SemKITTILoader(root, 13000, train=False, subset='all', map_type = 'learning')
     testdataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=6)
 
     for i in range(2):

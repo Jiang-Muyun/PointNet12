@@ -237,7 +237,6 @@ class PointNetSeg(nn.Module):
         self.conv3 = torch.nn.Conv1d(256, 128, 1)
         self.conv4 = torch.nn.Conv1d(128, self.k, 1)
         self.bn1 = nn.BatchNorm1d(512)
-        self.bn1_1 = nn.BatchNorm1d(1024)
         self.bn2 = nn.BatchNorm1d(256)
         self.bn3 = nn.BatchNorm1d(128)
 

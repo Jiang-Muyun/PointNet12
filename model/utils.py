@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader
 
 from .pointnet import PointNetSeg, feature_transform_reguliarzer
 from .pointnet2 import PointNet2SemSeg
-from inview_seg import parse_args
 
 def load_pointnet(model_name, num_classes, fn_pth):
     if model_name == 'pointnet':
