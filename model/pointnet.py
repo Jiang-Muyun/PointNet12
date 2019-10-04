@@ -228,7 +228,7 @@ class PointNetDenseCls(nn.Module):
         return net, net2, trans_feat
 
 class PointNetSeg(nn.Module):
-    def __init__(self,num_class,input_dims=4,feature_transform=False):
+    def __init__(self,num_class, input_dims=4, feature_transform=False):
         super(PointNetSeg, self).__init__()
         self.k = num_class
         self.feat = PointNetEncoder(global_feat=False,input_dims = input_dims, feature_transform=feature_transform)
@@ -250,10 +250,8 @@ class PointNetSeg(nn.Module):
         x = F.relu(self.bn3(self.conv3(x)))
         x = self.conv4(x)
         x = x.transpose(2,1).contiguous()
-        # print('before log_softmax', x.shape, x.min(), x.max())
         x = F.log_softmax(x.view(-1,self.k), dim=-1)
         x = x.view(batchsize, n_pts, self.k)
-        # print('after log_softmax', x.shape, x.min(), x.max())
         return x, trans_feat
 
 
@@ -264,6 +262,7 @@ def feature_transform_reguliarzer(trans):
         I = I.cuda()
     loss = torch.mean(torch.norm(torch.bmm(trans, trans.transpose(2, 1) - I), dim=(1, 2)))
     return loss
+
 
 class PointNetLoss(torch.nn.Module):
     def __init__(self, weight=1,mat_diff_loss_scale=0.001):

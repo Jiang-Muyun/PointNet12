@@ -48,7 +48,7 @@ def calc_decay(init_lr, epoch):
 def calc_categorical_iou(pred, target, num_classes ,iou_tabel):
     choice = pred.max(-1)[1]
     target.squeeze_(-1)
-    for cat in range(num_classes):
+    for cat in range(1,num_classes):
         I = torch.sum((choice == cat) & (target == cat)).float()
         U = torch.sum((choice == cat) | (target == cat)).float()
         if U == 0:

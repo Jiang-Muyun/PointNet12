@@ -36,30 +36,37 @@ def pcd_unnormalize(pcd):
     pcd[:,3] = pcd[:,3] / 2 + 0.5
     return pcd
 
-class_names = [
-    'unlabelled',     # 0
-    'car',            # 1
-    'bicycle',        # 2
-    'motorcycle',     # 3
-    'truck',          # 4
-    'other-vehicle',  # 5
-    'person',         # 6
-    'bicyclist',      # 7
-    'motorcyclist',   # 8
-    'road',           # 9
-    'parking',        # 10
-    'sidewalk',       # 11
-    'other-ground',   # 12
-    'building',       # 13
-    'fence',          # 14
-    'vegetation',     # 15
-    'trunk',          # 16
-    'terrain',        # 17
-    'pole',           # 18
-    'traffic-sign'    # 19
-]
+class_names = ['unlabelled','car','bicycle','motorcycle','truck','other-vehicle',
+    'person','bicyclist','motorcyclist','road','parking','sidewalk','other-ground',
+    'building','fence','vegetation','trunk','terrain','pole','traffic-sign']
 
-sem_kitti_slim_mapping = {
+kitti_class_names = ['unlabelled', 'road', 'sidewalk', 'building', 'wall', 'fence',
+    'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain','sky', 'person', 
+    'rider', 'car', 'truck', 'bus', 'train','motorcycle', 'bicycle']
+
+sem_kitti_to_slim = {
+    'car':          'car',
+    'bicycle':      'bicycle',
+    'motorcycle':   'motorcycle',
+    'truck':        'truck',
+    'other-vehicle':'train',
+    'person':       'person',
+    'bicyclist':    'rider',
+    'motorcyclist': 'rider',
+    'road':         'road',
+    'parking':      'ground',  # Not sure
+    'sidewalk':     'sidewalk',
+    'other-ground': 'ground',
+    'building':     'structure',
+    'fence':        'structure',
+    'vegetation':   'nature',
+    'trunk':        'nature',
+    'terrain':      'nature',
+    'pole':         'structure',
+    'traffic-sign': 'structure'
+}
+
+sem_kitti_to_kitti = {
     'unlabelled':   'unlabelled', # 0
     'car':          'vehicle',    # 1
     'bicycle':      'vehicle',    # 2
@@ -111,25 +118,31 @@ class Semantic_KITTI_Utils():
         self.where = where
         self.map_type = map_type
 
-        colors = [[0, 0, 0],
-            [128, 64, 128],[244, 35, 232],[70, 70, 70],[102, 102, 156],
-            [190, 153, 153],[153, 153, 153],[250, 170, 30],[220, 220, 0],
-            [107, 142, 35],[152, 251, 152],[0, 130, 180],[220, 20, 60],
-            [255, 0, 0],[0, 0, 142],[0, 0, 70],[0, 60, 100],[0, 80, 100],
-            [0, 0, 230],[119, 11, 32]
+        # colors = [[0, 0, 0],
+        #     [128, 64, 128],[244, 35, 232],[70, 70, 70],[102, 102, 156],
+        #     [190, 153, 153],[153, 153, 153],[250, 170, 30],[220, 220, 0],
+        #     [107, 142, 35],[152, 251, 152],[0, 130, 180],[220, 20, 60],
+        #     [255, 0, 0],[0, 0, 142],[0, 0, 70],[0, 60, 100],[0, 80, 100],
+        #     [0, 0, 230],[119, 11, 32]
+        # ]
+        colors = [
+            [0, 0, 0],[245, 150, 100],[245, 230, 100],[150, 60, 30],[180, 30, 80],
+            [255, 0, 0],[30, 30, 255],[200, 40, 255],[90, 30, 150],[255, 0, 255],
+            [255, 150, 255], [75, 0, 75],[75, 0, 175],[0, 200, 255],[50, 120, 255],
+            [0, 175, 0],[0, 60, 135],[80, 240, 150],[150, 240, 255],[0, 0, 255]
         ]
-        
         self.kitti_colors = np.array(colors,np.uint8)
         self.kitti_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
         
-        colors = [
-            [0, 0, 0],[245, 150, 100],[30, 30, 255],
-            [255, 0, 255],[0, 200, 255],[0, 175, 0]]
+        colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
         self.slim_colors = np.array(colors,np.uint8)
         self.slim_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
 
         if self.map_type == 'learning':
             self.num_classes = 20
+            class_names = ['unlabelled','car','bicycle','motorcycle','truck','other-vehicle',
+                    'person','bicyclist','motorcyclist','road','parking','sidewalk','other-ground',
+                    'building','fence','vegetation','trunk','terrain','pole','traffic-sign']
             self.index_to_name = {i:name for i,name in enumerate(class_names)}
             self.name_to_index = {name:i for i,name in enumerate(class_names)}
             self.class_names = class_names
@@ -143,7 +156,7 @@ class Semantic_KITTI_Utils():
             self.index_to_name = {i:name for i,name in enumerate(slim_class_names)}
             self.name_to_index = {name:i for i,name in enumerate(slim_class_names)}
             
-            mapping_list = [slim_class_names.index(sem_kitti_slim_mapping[name]) for name in class_names]
+            mapping_list = [slim_class_names.index(sem_kitti_to_slim[name]) for name in class_names]
             self.slim_mapping = np.array(mapping_list,dtype=np.int32)
 
             self.num_classes = num_classes
