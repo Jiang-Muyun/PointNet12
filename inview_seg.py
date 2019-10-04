@@ -29,7 +29,7 @@ def parse_args(notebook = False):
     parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'), help='pointnet or pointnet2')
     parser.add_argument('--mode', default='train', help='train or eval')
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
-    parser.add_argument('--map', type=str, default='slim', choices=('slim', 'learning'), help='slim(6) or learning(20)')
+    parser.add_argument('--map', type=str, default='learning', choices=('slim', 'learning'), help='slim(6) or learning(20)')
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
     parser.add_argument('--pretrain', type=str, default=None, help='whether use pretrain model')

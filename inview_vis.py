@@ -20,17 +20,13 @@ import my_log as log
 
 from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
+from model.utils import load_pointnet
 
 from inview_seg import parse_args
 from data_utils.SemKITTI_Loader import pcd_normalize, Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
-kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'slim')
-num_classes = kitti_utils.num_classes
-class_names = kitti_utils.class_names
-index_to_name = kitti_utils.index_to_name
-colors = kitti_utils.colors
-colors_bgr = kitti_utils.colors_bgr
+kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, where='inview', map_type = 'learning')
 
 class Window_Manager():
     def __init__(self):
@@ -103,29 +99,16 @@ def export_video():
 
 def vis(args):
     part = '03'
+    args.map = 'learning'
+    args.model_name = 'pointnet'
+
     vis_handle = Window_Manager()
-
-    log.msg('Building Model', args.model_name)
     if args.model_name == 'pointnet':
-        model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
+        args.pretrain = 'checkpoints/inview-pointnet-learning-0.54916-0063.pth'
     else:
-        model = PointNet2SemSeg(num_classes, feature_dims = 1)
+        args.pretrain = 'checkpoints/inview-pointnet2-learning-0.56718-0007.pth'
 
-    torch.backends.cudnn.benchmark = True
-    model = torch.nn.DataParallel(model)
-    log.msg('Using gpu:',args.gpu)
-
-    if args.pretrain == None:
-        if args.model_name == 'pointnet':
-            args.pretrain = 'checkpoints/inview-pointnet-0.56354-0036.pth'
-        else:
-            args.pretrain = 'checkpoints/inview-pointnet2-0.54945-0019.pth'
-
-    assert args.pretrain is not None,'No pretrain model'
-    checkpoint = torch.load(args.pretrain)
-    model.load_state_dict(checkpoint)
-    model.cuda()
-    model.eval()
+    model = load_pointnet(args.model_name, kitti_utils.num_classes, args.pretrain)
 
     for index in range(160, kitti_utils.get_max_index(part)):
         with log.Tick():
@@ -151,8 +134,8 @@ def vis(args):
                 # pts_2d = kitti_utils.project_3d_to_2d(pts_3d)
                 pts_2d = kitti_utils.torch_project_3d_to_2d(pts_3d)
 
-                vis_handle.update(pts_3d, colors[pred_choice])
-                sem_img = kitti_utils.draw_2d_points(pts_2d, colors_bgr[pred_choice])
+                vis_handle.update(pts_3d, kitti_utils.colors[pred_choice])
+                sem_img = kitti_utils.draw_2d_points(pts_2d, kitti_utils.colors_bgr[pred_choice])
 
         cv2.imshow('semantic', sem_img)
         if 32 == cv2.waitKey(1):
