@@ -28,7 +28,7 @@ KITTI_ROOT = os.environ['KITTI_ROOT']
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
-    parser.add_argument('mode', default='train', choices=('train', 'eval'))
+    parser.add_argument('--mode', default='train', choices=('train', 'eval'))
     #parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'))
     parser.add_argument('--pn2', default=False, action='store_true')
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
