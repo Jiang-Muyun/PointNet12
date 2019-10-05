@@ -101,10 +101,9 @@ def export_video():
 def vis(args):
     part = '01'
     args.subset ='inview'
-    args.map = 'learning'
     args.model_name = 'pointnet'
 
-    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
+    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset)
 
     vis_handle = Window_Manager()
     if args.model_name == 'pointnet':
@@ -116,31 +115,33 @@ def vis(args):
 
     for index in range(0, kitti_utils.get_max_index(part)):
         point_cloud, label = kitti_utils.get(part, index, load_image=True)
+        
+        # resample point cloud
+        npoints = 25000
+        choice = np.random.choice(length, npoints, replace=True)
+        point_cloud = point_cloud[choice]
+        label = label[choice]
+
+        pts_3d = point_cloud[:,:3]
+        pcd = pcd_normalize(point_cloud)
+
         with log.Tick():
-            with log.Tock('pre'):
-                point_cloud = point_cloud[:22000]
-                pts_3d = point_cloud[:,:3]
-                pcd = pcd_normalize(point_cloud)
-                points = torch.from_numpy(pcd).unsqueeze(0)
-                points = points.transpose(2, 1).cuda()
+            points = torch.from_numpy(pcd).unsqueeze(0).transpose(2, 1).cuda()
+            
+            with torch.no_grad():
+                if args.model_name == 'pointnet':
+                    logits, _ = model(points)
+                else:
+                    logits = model(points)
+                    pred = logits[0].argmax(-1).cpu().numpy()
 
-            with log.Tock('network'):
-                with torch.no_grad():
-                    if args.model_name == 'pointnet':
-                        pred, _ = model(points)
-                    else:
-                        pred = model(points)
-                    pred_choice = pred.data.max(-1)[1].cpu().squeeze_(0).numpy()
-                    sem_label = pred_choice
+            print(index, pred.shape, end='')
 
-                print(index, pred_choice.shape, end='')
+        # pts_2d = kitti_utils.project_3d_to_2d(pts_3d)
+        pts_2d = kitti_utils.torch_project_3d_to_2d(pts_3d)
 
-            with log.Tock('disp'):
-                # pts_2d = kitti_utils.project_3d_to_2d(pts_3d)
-                pts_2d = kitti_utils.torch_project_3d_to_2d(pts_3d)
-
-        vis_handle.update(pts_3d, kitti_utils.colors[pred_choice])
-        sem_img = kitti_utils.draw_2d_points(pts_2d, kitti_utils.colors_bgr[pred_choice])
+        vis_handle.update(pts_3d, kitti_utils.colors[pred])
+        sem_img = kitti_utils.draw_2d_points(pts_2d, kitti_utils.colors_bgr[pred])
 
         cv2.imshow('semantic', sem_img)
         cv2.imshow('frame', cv2.cvtColor(kitti_utils.frame,cv2.COLOR_BGR2RGB))
