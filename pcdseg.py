@@ -29,7 +29,7 @@ KITTI_ROOT = os.environ['KITTI_ROOT']
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--mode', default='train', choices=('train', 'eval'))
-    #parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'))
+    parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'))
     parser.add_argument('--pn2', default=False, action='store_true')
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
     parser.add_argument('--subset', type=str, default='inview', choices=('inview', 'all'))
@@ -103,10 +103,20 @@ def train(args):
     class_names = kitti_utils.class_names
     num_classes = kitti_utils.num_classes
 
-    dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, subset=args.subset)
+    if args.subset == 'inview':
+        train_npts = 8000
+        test_npts = 24000
+    
+    if args.subset == 'all':
+        train_npts = 50000
+        test_npts = 100000
+
+    log.info(subset=args.subset, train_npts=train_npts, test_npts=test_npts)
+
+    dataset = SemKITTI_Loader(KITTI_ROOT, train_npts, train=True, subset=args.subset)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset)
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, test_npts, train=False, subset=args.subset)
     testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
 
     if args.model_name == 'pointnet':
@@ -198,7 +208,15 @@ def evaluate(args):
     class_names = kitti_utils.class_names
     num_classes = kitti_utils.num_classes
 
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset)
+    if args.subset == 'inview':
+        test_npts = 24000
+    
+    if args.subset == 'all':
+        test_npts = 100000
+
+    log.info(subset=args.subset, test_npts=test_npts)
+
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, test_npts, train=False, subset=args.subset)
     testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
 
     model = load_pointnet(args.model_name, kitti_utils.num_classes, args.pretrain)

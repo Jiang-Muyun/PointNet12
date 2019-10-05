@@ -29,7 +29,6 @@ kitti_colors = [[128, 64, 128],[244, 35, 232],[70, 70, 70],[102, 102, 156],
     [152, 251, 152],[0, 130, 180],[220, 20, 60],[255, 0, 0],[0, 0, 142],
     [0, 0, 70],[0, 60, 100],[0, 80, 100],[0, 0, 230],[119, 11, 32]
 ]
-
 sem_kitti_to_slim = {
     'car':          'car',
     'bicycle':      'bicycle',
@@ -105,6 +104,10 @@ class Semantic_KITTI_Utils():
         self.num_classes = 19
         self.index_to_name = {i:name for i,name in enumerate(sem_kitti_class_names)}
         self.name_to_index = {name:i for i,name in enumerate(sem_kitti_class_names)}
+
+        self.kitti_index_to_name = {i:name for i,name in enumerate(kitti_class_names)}
+        self.kitti_name_to_index = {name:i for i,name in enumerate(kitti_class_names)}
+
         self.class_names = sem_kitti_class_names
 
         self.kitti_colors = np.array(kitti_colors,np.uint8)
