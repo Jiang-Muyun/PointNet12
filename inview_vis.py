@@ -23,7 +23,8 @@ from model.pointnet2 import PointNet2SemSeg
 from model.utils import load_pointnet
 
 from inview_seg import parse_args
-from data_utils.SemKITTI_Loader import pcd_normalize, Semantic_KITTI_Utils
+from data_utils.SemKITTI_Loader import pcd_normalize
+from data_utils.kitti_utils import Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 

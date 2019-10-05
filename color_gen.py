@@ -21,7 +21,8 @@ from model.pointnet2 import PointNet2SemSeg
 from model.utils import load_pointnet
 
 from utils import mkdir, select_avaliable
-from data_utils.SemKITTI_Loader import Semantic_KITTI_Utils, ColorGeneratorLoader
+from data_utils.kitti_utils import Semantic_KITTI_Utils
+from data_utils.SemKITTI_Loader import ColorGeneratorLoader
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 
@@ -47,47 +48,6 @@ def parse_args(notebook = False):
 def calc_decay(init_lr, epoch):
     return init_lr * 1/(1 + 0.03*epoch)
 
-def test_kitti_semseg(model, loader, model_name, num_classes, class_names):
-    ious = np.zeros((num_classes,), dtype = np.float32)
-    count = np.zeros((num_classes,), dtype = np.uint32)
-    count[0] = 1
-    accuracy = []
-    
-    for points, target in tqdm(loader, total=len(loader), smoothing=0.9, dynamic_ncols=True):
-        batch_size, num_point, _ = points.size()
-        points = points.float().transpose(2, 1).cuda()
-        target = target.long().cuda()
-
-        with torch.no_grad():
-            if model_name == 'pointnet':
-                pred, _ = model(points)
-            else:
-                pred = model(points)
-
-            pred_choice = pred.argmax(-1)
-            target = target.squeeze(-1)
-
-            for class_id in range(1,num_classes):
-                I = torch.sum((pred_choice == class_id) & (target == class_id)).cpu().item()
-                U = torch.sum((pred_choice == class_id) | (target == class_id)).cpu().item()
-                iou = 1 if U == 0 else I/U
-                ious[class_id] += iou
-                count[class_id] += 1
-
-            correct = (pred_choice == target).sum().cpu().item()
-            accuracy.append(correct/ (batch_size * num_point)) 
-
-    categorical_iou = ious / count
-    df = pd.DataFrame(categorical_iou, columns=['mIOU'], index=class_names)
-    df = df.sort_values(by='mIOU', ascending=False)
-
-    log.info('categorical mIOU')
-    log.msg(df)
-    log.info('Overall mIOU does not include unlabelled class')
-
-    acc = np.mean(accuracy)
-    miou = np.mean(categorical_iou[1:])
-    return acc, miou
 
 def train(args):
     experiment_dir = mkdir('experiment/')
@@ -96,14 +56,14 @@ def train(args):
     kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
     num_classes = 3
 
-    dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, subset=args.subset, map_type = args.map)
+    dataset = ColorGeneratorLoader(KITTI_ROOT, 8000, train=True)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset, map_type = args.map)
-    testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
+    test_dataset = ColorGeneratorLoader(KITTI_ROOT, 24000, train=False)
+    testdataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
     if args.model_name == 'pointnet':
-        model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
+        model = PointNetColorGen(num_classes, input_dims = 4, feature_transform=True)
     else:
         model = PointNet2SemSeg(num_classes, feature_dims = 1)
 
@@ -136,56 +96,66 @@ def train(args):
 
     for epoch in range(init_epoch,args.epoch):
         lr = calc_decay(args.learning_rate, epoch)
-        log.info(job='inview_'+args.map, model=args.model_name,gpu=args.gpu, epoch=epoch, lr=lr)
+        log.info(job='ColorGen'+args.map, model=args.model_name,gpu=args.gpu, epoch=epoch, lr=lr)
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
-        for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
-            points, target = data
-            points, target = points.float(), target.long()
-            points = points.transpose(2, 1)
-            points, target = points.cuda(), target.cuda()
+        for points, target in tqdm(dataloader, total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
+            points = points.float().transpose(2, 1).cuda()
+            target = target.float().cuda()
+
             optimizer.zero_grad()
             model = model.train()
             
             if args.model_name == 'pointnet':
                 pred, trans_feat = model(points)
+                trans_loss = feature_transform_reguliarzer(trans_feat) * 0.001
             else:
                 pred = model(points)
 
-            pred = pred.contiguous().view(-1, num_classes)
-            target = target.view(-1, 1)[:, 0]
-            loss = F.nll_loss(pred, target)
+            loss1 = torch.mean((pred - target) **2)            
+            # print(loss1.detach().cpu().item(), trans_loss.detach().cpu().item())
 
-            if args.model_name == 'pointnet':
-                loss += feature_transform_reguliarzer(trans_feat) * 0.001
-
+            loss = loss1 + trans_loss
             loss.backward()
             optimizer.step()
         
-        log.debug('clear cuda cache')
-        torch.cuda.empty_cache()
+        #log.debug('clear cuda cache')
+        #torch.cuda.empty_cache()
 
-        acc, miou = test_kitti_semseg(model.eval(), testdataloader,args.model_name,num_classes,class_names)
+        model.eval()
+        best_MSE = 10.0
+        buf = []
 
+        for points, target in tqdm(testdataloader, total=len(testdataloader), smoothing=0.9, dynamic_ncols=True):
+            points = points.float().transpose(2, 1).cuda()
+            target = target.float().cuda()
+            
+            with torch.no_grad():
+                if args.model_name == 'pointnet':
+                    pred, trans_feat = model(points)
+                else:
+                    pred = model(points)
+
+                buf.append(torch.mean((pred - target) **2).detach().cpu().item())
+
+        MSE = np.mean(buf)
+        print(MSE, best_MSE)
         save_model = False
-        if acc > best_acc:
-            best_acc = acc
-        
-        if miou > best_miou:
-            best_miou = miou
+        if MSE < best_MSE:
+            best_MSE = MSE
             save_model = True
         
         if save_model:
-            fn_pth = '%s-%s-%s-%.5f-%04d.pth' % (args.model_name, args.subset, args.map, best_miou, epoch)
+            fn_pth = 'ColorGen-%s-%.5f-%04d.pth' % (args.model_name, best_MSE, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
         else:
             log.info('No need to save model')
 
-        log.warn('Curr',accuracy=acc, mIOU=miou)
-        log.warn('Best',accuracy=best_acc, mIOU=best_miou)
+        log.warn('Curr',MSE=MSE)
+        log.warn('Best',MSE=best_MSE)
 
 
 if __name__ == '__main__':

@@ -21,14 +21,15 @@ from model.pointnet2 import PointNet2SemSeg
 from model.utils import load_pointnet
 
 from utils import mkdir, select_avaliable
-from data_utils.SemKITTI_Loader import Semantic_KITTI_Utils, SemKITTI_Loader
+from data_utils.SemKITTI_Loader import SemKITTI_Loader
+from data_utils.kitti_utils import Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
     parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'))
-    parser.add_argument('--mode', default='train', help='train or eval')
+    parser.add_argument('--mode', default='train', choices=('train', 'eval'))
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
     parser.add_argument('--map', type=str, default='learning', choices=('slim', 'learning'))
     parser.add_argument('--subset', type=str, default='inview', choices=('inview', 'all'))
@@ -142,11 +143,10 @@ def train(args):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
-        for i, data in tqdm(enumerate(dataloader, 0),total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
-            points, target = data
-            points, target = points.float(), target.long()
-            points = points.transpose(2, 1)
-            points, target = points.cuda(), target.cuda()
+        for points, target in tqdm(dataloader, total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
+            points = points.float().transpose(2, 1).cuda()
+            target = target.long().cuda()
+
             optimizer.zero_grad()
             model = model.train()
             
