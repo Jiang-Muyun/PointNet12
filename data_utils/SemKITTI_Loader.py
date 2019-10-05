@@ -88,17 +88,21 @@ class SemKITTI_Loader(Dataset):
             pcd = pcd_jitter(pcd)
 
         length = pcd.shape[0]
-        if length == self.npoints:
-            pass
-        elif length > self.npoints:
-            start_idx = np.random.randint(0, length - self.npoints)
-            end_idx = start_idx + self.npoints
-            pcd = pcd[start_idx:end_idx]
-            label = label[start_idx:end_idx]
-        else:
-            rows_short = self.npoints - length
-            pcd = np.concatenate((pcd,pcd[0:rows_short]),axis=0)
-            label = np.concatenate((label,label[0:rows_short]),axis=0)
+        # if length == self.npoints:
+        #     pass
+        # elif length > self.npoints:
+        #     start_idx = np.random.randint(0, length - self.npoints)
+        #     end_idx = start_idx + self.npoints
+        #     pcd = pcd[start_idx:end_idx]
+        #     label = label[start_idx:end_idx]
+        # else:
+        #     rows_short = self.npoints - length
+        #     pcd = np.concatenate((pcd,pcd[0:rows_short]),axis=0)
+        #     label = np.concatenate((label,label[0:rows_short]),axis=0)
+
+        choice = np.random.choice(length, self.npoints, replace=True)
+        pcd = pcd[choice]
+        label = label[choice]
 
         return pcd, label
 
