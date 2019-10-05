@@ -8,13 +8,27 @@ from tqdm import tqdm
 import torch
 from PIL import Image
 
-class_names = ['unlabelled','car','bicycle','motorcycle','truck','other-vehicle',
+sem_kitti_class_names = [#'unlabelled',
+    'car','bicycle','motorcycle','truck','other-vehicle',
     'person','bicyclist','motorcyclist','road','parking','sidewalk','other-ground',
     'building','fence','vegetation','trunk','terrain','pole','traffic-sign']
 
-kitti_class_names = ['unlabelled', 'road', 'sidewalk', 'building', 'wall', 'fence',
+sem_kitti_colors = [[245, 150, 100],[245, 230, 100],[150, 60, 30],[180, 30, 80],
+    [255, 0, 0],[30, 30, 255],[200, 40, 255],[90, 30, 150],[255, 0, 255],
+    [255, 150, 255], [75, 0, 75],[75, 0, 175],[0, 200, 255],[50, 120, 255],
+    [0, 175, 0],[0, 60, 135],[80, 240, 150],[150, 240, 255],[0, 0, 255]
+]
+
+kitti_class_names = [#'unlabelled', 
+    'road', 'sidewalk', 'building', 'wall', 'fence',
     'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain','sky', 'person', 
     'rider', 'car', 'truck', 'bus', 'train','motorcycle', 'bicycle']
+
+kitti_colors = [[128, 64, 128],[244, 35, 232],[70, 70, 70],[102, 102, 156],
+    [190, 153, 153],[153, 153, 153],[250, 170, 30],[220, 220, 0],[107, 142, 35],
+    [152, 251, 152],[0, 130, 180],[220, 20, 60],[255, 0, 0],[0, 0, 142],
+    [0, 0, 70],[0, 60, 100],[0, 80, 100],[0, 0, 230],[119, 11, 32]
+]
 
 sem_kitti_to_slim = {
     'car':          'car',
@@ -63,7 +77,7 @@ sem_kitti_to_kitti = {
 
     
 class Semantic_KITTI_Utils():
-    def __init__(self, root, subset = 'all', map_type = 'learning'):
+    def __init__(self, root, subset = 'all'):
         self.root = root
 
         base_path = os.path.dirname(os.path.realpath(__file__)) + '/../'
@@ -85,56 +99,37 @@ class Semantic_KITTI_Utils():
             '06':1100,'07':1100,'08':4070,'09':1590,'10':1200
         }
         assert subset in ['all', 'inview'], subset
-        assert map_type in ['learning','slim'], map_type
 
         self.subset = subset
-        self.map_type = map_type
 
-        # colors = [[0, 0, 0],
-        #     [128, 64, 128],[244, 35, 232],[70, 70, 70],[102, 102, 156],
-        #     [190, 153, 153],[153, 153, 153],[250, 170, 30],[220, 220, 0],
-        #     [107, 142, 35],[152, 251, 152],[0, 130, 180],[220, 20, 60],
-        #     [255, 0, 0],[0, 0, 142],[0, 0, 70],[0, 60, 100],[0, 80, 100],
-        #     [0, 0, 230],[119, 11, 32]
-        # ]
-        colors = [
-            [0, 0, 0],[245, 150, 100],[245, 230, 100],[150, 60, 30],[180, 30, 80],
-            [255, 0, 0],[30, 30, 255],[200, 40, 255],[90, 30, 150],[255, 0, 255],
-            [255, 150, 255], [75, 0, 75],[75, 0, 175],[0, 200, 255],[50, 120, 255],
-            [0, 175, 0],[0, 60, 135],[80, 240, 150],[150, 240, 255],[0, 0, 255]
-        ]
-        self.kitti_colors = np.array(colors,np.uint8)
-        self.kitti_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
+        self.num_classes = 19
+        self.index_to_name = {i:name for i,name in enumerate(sem_kitti_class_names)}
+        self.name_to_index = {name:i for i,name in enumerate(sem_kitti_class_names)}
+        self.class_names = sem_kitti_class_names
+
+        self.kitti_colors = np.array(kitti_colors,np.uint8)
+        self.kitti_colors_bgr = np.array([list(reversed(c)) for c in kitti_colors],np.uint8)
+
+        self.colors = np.array(sem_kitti_colors,np.uint8)
+        self.colors_bgr = np.array([list(reversed(c)) for c in sem_kitti_colors],np.uint8)
         
-        colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
-        self.slim_colors = np.array(colors,np.uint8)
-        self.slim_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
+        #colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
+        #self.slim_colors = np.array(colors,np.uint8)
+        #self.slim_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
 
-        if self.map_type == 'learning':
-            self.num_classes = 20
-            class_names = ['unlabelled','car','bicycle','motorcycle','truck','other-vehicle',
-                    'person','bicyclist','motorcyclist','road','parking','sidewalk','other-ground',
-                    'building','fence','vegetation','trunk','terrain','pole','traffic-sign']
-            self.index_to_name = {i:name for i,name in enumerate(class_names)}
-            self.name_to_index = {name:i for i,name in enumerate(class_names)}
-            self.class_names = class_names
-
-            self.colors = self.kitti_colors
-            self.colors_bgr = self.kitti_colors_bgr
-
-        if self.map_type == 'slim':
-            num_classes = 6
-            slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
-            self.index_to_name = {i:name for i,name in enumerate(slim_class_names)}
-            self.name_to_index = {name:i for i,name in enumerate(slim_class_names)}
+        # if self.map_type == 'slim':
+        #     num_classes = 6
+        #     slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
+        #     self.index_to_name = {i:name for i,name in enumerate(slim_class_names)}
+        #     self.name_to_index = {name:i for i,name in enumerate(slim_class_names)}
             
-            mapping_list = [slim_class_names.index(sem_kitti_to_slim[name]) for name in class_names]
-            self.slim_mapping = np.array(mapping_list,dtype=np.int32)
+        #     mapping_list = [slim_class_names.index(sem_kitti_to_slim[name]) for name in class_names]
+        #     self.slim_mapping = np.array(mapping_list,dtype=np.int32)
 
-            self.num_classes = num_classes
-            self.class_names = slim_class_names
-            self.colors = self.slim_colors
-            self.colors_bgr = self.slim_colors_bgr
+        #     self.num_classes = num_classes
+        #     self.class_names = slim_class_names
+        #     self.colors = self.slim_colors
+        #     self.colors_bgr = self.slim_colors_bgr
 
     def get(self, part, index, load_image = False):
         
@@ -146,7 +141,7 @@ class Semantic_KITTI_Utils():
             assert os.path.exists(fn_frame), 'Broken dataset %s' % (fn_frame)
             self.frame_BGR = cv2.imread(fn_frame)
             self.frame = cv2.cvtColor(self.frame_BGR, cv2.COLOR_BGR2RGB)
-            self.frame_HSV = cv2.cvtColor(self.frame_BGR, cv2.COLOR_BGR2HSV)
+            #self.frame_HSV = cv2.cvtColor(self.frame_BGR, cv2.COLOR_BGR2HSV)
 
         fn_velo = os.path.join(sequence_root, 'velodyne/%06d.bin' %(index))
         fn_label = os.path.join(sequence_root, 'labels/%06d.label' %(index))
@@ -154,30 +149,31 @@ class Semantic_KITTI_Utils():
         assert os.path.exists(fn_label), 'Broken dataset %s' % (fn_label)
             
         points = np.fromfile(fn_velo, dtype=np.float32).reshape(-1, 4)
-        label = np.fromfile(fn_label, dtype=np.uint32).reshape((-1))
+        raw_label = np.fromfile(fn_label, dtype=np.uint32).reshape((-1))
 
-        if label.shape[0] == points.shape[0]:
-            sem_label = label & 0xFFFF  # semantic label in lower half
-            inst_label = label >> 16  # instance id in upper half
-            assert((sem_label + (inst_label << 16) == label).all()) # sanity check
+        if raw_label.shape[0] == points.shape[0]:
+            label = raw_label & 0xFFFF  # semantic label in lower half
+            inst_label = raw_label >> 16  # instance id in upper half
+            assert((label + (inst_label << 16) == raw_label).all()) # sanity check
         else:
             print("Points shape: ", points.shape)
             print("Label shape: ", label.shape)
             raise ValueError("Scan and Label don't contain same number of points")
+        
+        # Map to learning 20 classes
+        label = np.array([self.learning_map[x] for x in label], dtype=np.int32)
+
+        # Drop class -> 0
+        drop_class_0 = np.where(label != 0)
+        points = points[drop_class_0]
+        label = label[drop_class_0] - 1
+        assert (label >=0).all and (label<self.num_classes).all(), np.unique(label)
 
         if self.subset == 'inview':
             self.set_filter([-40, 40], [-20, 20])
             combined = self.points_basic_filter(points)
             points = points[combined]
-            label = sem_label[combined]
-        
-        if self.subset == 'all':
-            label = sem_label
-
-        label = np.array([self.learning_map[x] for x in label], dtype=np.int32)
-
-        if self.map_type == 'slim':
-            label = np.array([self.slim_mapping[x] for x in label], dtype=np.int32)
+            label = label[combined]
 
         return points, label
     

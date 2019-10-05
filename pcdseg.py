@@ -28,10 +28,10 @@ KITTI_ROOT = os.environ['KITTI_ROOT']
 
 def parse_args(notebook = False):
     parser = argparse.ArgumentParser('PointNet')
-    parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'))
-    parser.add_argument('--mode', default='train', choices=('train', 'eval'))
+    parser.add_argument('mode', default='train', choices=('train', 'eval'))
+    #parser.add_argument('--model_name', type=str, default='pointnet', choices=('pointnet', 'pointnet2'))
+    parser.add_argument('--pn2', default=False, action='store_true')
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
-    parser.add_argument('--map', type=str, default='learning', choices=('slim', 'learning'))
     parser.add_argument('--subset', type=str, default='inview', choices=('inview', 'all'))
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs for training')
@@ -41,9 +41,15 @@ def parse_args(notebook = False):
     parser.add_argument('--optimizer', type=str, default='Adam', help='type of optimizer')
     parser.add_argument('--augment', default=False, action='store_true', help="Enable data augmentation")
     if notebook:
-        return parser.parse_args([])
+        args = parser.parse_args([])
     else:
-        return parser.parse_args()
+        args = parser.parse_args()
+    
+    if args.pn2 == False:
+        args.model_name = 'pointnet'
+    else:
+        args.model_name = 'pointnet2'
+    return args
 
 def calc_decay(init_lr, epoch):
     return init_lr * 1/(1 + 0.03*epoch)
@@ -68,7 +74,7 @@ def test_kitti_semseg(model, loader, model_name, num_classes, class_names):
             pred_choice = pred.argmax(-1)
             target = target.squeeze(-1)
 
-            for class_id in range(1,num_classes):
+            for class_id in range(num_classes):
                 I = torch.sum((pred_choice == class_id) & (target == class_id)).cpu().item()
                 U = torch.sum((pred_choice == class_id) | (target == class_id)).cpu().item()
                 iou = 1 if U == 0 else I/U
@@ -84,7 +90,6 @@ def test_kitti_semseg(model, loader, model_name, num_classes, class_names):
 
     log.info('categorical mIOU')
     log.msg(df)
-    log.info('Overall mIOU does not include unlabelled class')
 
     acc = np.mean(accuracy)
     miou = np.mean(categorical_iou[1:])
@@ -92,16 +97,16 @@ def test_kitti_semseg(model, loader, model_name, num_classes, class_names):
 
 def train(args):
     experiment_dir = mkdir('experiment/')
-    checkpoints_dir = mkdir('experiment/inview/%s/'%(args.model_name))
+    checkpoints_dir = mkdir('experiment/%s/'%(args.model_name))
     
-    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
+    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset)
     class_names = kitti_utils.class_names
     num_classes = kitti_utils.num_classes
 
-    dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, subset=args.subset, map_type = args.map)
+    dataset = SemKITTI_Loader(KITTI_ROOT, 8000, train=True, subset=args.subset)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset, map_type = args.map)
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset)
     testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
 
     if args.model_name == 'pointnet':
@@ -138,7 +143,7 @@ def train(args):
 
     for epoch in range(init_epoch,args.epoch):
         lr = calc_decay(args.learning_rate, epoch)
-        log.info(job='inview_'+args.map, model=args.model_name,gpu=args.gpu, epoch=epoch, lr=lr)
+        log.info(subset=args.subset, model=args.model_name, gpu=args.gpu, epoch=epoch, lr=lr)
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -179,7 +184,7 @@ def train(args):
             save_model = True
         
         if save_model:
-            fn_pth = '%s-%s-%s-%.5f-%04d.pth' % (args.model_name, args.subset, args.map, best_miou, epoch)
+            fn_pth = '%s-%s-%.5f-%04d.pth' % (args.model_name, args.subset, best_miou, epoch)
             log.info('Save model...',fn = fn_pth)
             torch.save(model.state_dict(), os.path.join(checkpoints_dir, fn_pth))
         else:
@@ -189,11 +194,11 @@ def train(args):
         log.warn('Best',accuracy=best_acc, mIOU=best_miou)
 
 def evaluate(args):
-    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset, map_type = args.map)
+    kitti_utils = Semantic_KITTI_Utils(KITTI_ROOT, subset=args.subset)
     class_names = kitti_utils.class_names
     num_classes = kitti_utils.num_classes
 
-    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset, map_type = args.map)
+    test_dataset = SemKITTI_Loader(KITTI_ROOT, 24000, train=False, subset=args.subset)
     testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
 
     model = load_pointnet(args.model_name, kitti_utils.num_classes, args.pretrain)

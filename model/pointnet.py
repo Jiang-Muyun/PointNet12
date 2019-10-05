@@ -253,31 +253,6 @@ class PointNetSeg(nn.Module):
         x = x.view(batchsize, n_pts, self.k)
         return x, trans_feat
 
-class PointNetColorGen(nn.Module):
-    def __init__(self,num_class, input_dims=4, feature_transform=False):
-        super(PointNetColorGen, self).__init__()
-        self.k = num_class
-        self.feat = PointNetEncoder(global_feat=False,input_dims = input_dims, feature_transform=feature_transform)
-        self.conv1 = torch.nn.Conv1d(1088, 512, 1)
-        self.conv2 = torch.nn.Conv1d(512, 256, 1)
-        self.conv3 = torch.nn.Conv1d(256, 128, 1)
-        self.conv4 = torch.nn.Conv1d(128, self.k, 1)
-        self.bn1 = nn.BatchNorm1d(512)
-        self.bn2 = nn.BatchNorm1d(256)
-        self.bn3 = nn.BatchNorm1d(128)
-
-    def forward(self, x):
-        batchsize = x.size()[0]
-        n_pts = x.size()[2]
-        x, trans, trans_feat = self.feat(x)
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = F.relu(self.bn3(self.conv3(x)))
-        x = self.conv4(x)
-        x = x.transpose(2,1).contiguous()
-        x = x.view(batchsize, n_pts, self.k)
-        return x, trans_feat
-
 
 def feature_transform_reguliarzer(trans):
     d = trans.size()[1]
