@@ -58,7 +58,7 @@ class SemKITTI_Loader(Dataset):
                 for index in range(0,length,2):
                     self.keys.append('%s/%s/%06d'%(alias, part, index))
         else:
-            for part in ['03']:
+            for part in ['08']:
                 length = part_length[part]
                 for index in range(0,length):
                     self.keys.append('%s/%s/%06d'%(alias, part, index))
