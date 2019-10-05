@@ -170,6 +170,9 @@ class Semantic_KITTI_Utils():
             combined = self.points_basic_filter(points)
             points = points[combined]
             label = sem_label[combined]
+        
+        if self.subset == 'all':
+            label = sem_label
 
         label = np.array([self.learning_map[x] for x in label], dtype=np.int32)
 
