@@ -319,18 +319,29 @@ class Semantic_KITTI_Utils():
 
         return pts_2d.detach().cpu().numpy()
 
-    def draw_2d_points(self, pts_2d, colors, on_black = False):
+    def draw_2d_points(self, pts_2d, colors, image = None):
         """ draw 2d points in camera image """
         assert pts_2d.shape[1] == 2, pts_2d.shape
 
-        if on_black:
-            image = np.zeros_like(self.frame)
-        else:
+        if image is None:
             image = self.frame.copy()
         pts = pts_2d.astype(np.int32).tolist()
 
         for (x,y),c in zip(pts, colors.tolist()):
             cv2.circle(image, (x, y), 2, c, -1)
+
+        return image
+
+    def draw_2d_top_view(self, pcd_3d, colors):
+        """ draw 2d points in camera image """
+        assert pcd_3d.shape[1] == 3, pcd_3d.shape
+
+        image = np.zeros((600,800,3),dtype=np.uint8)
+
+        for (x,y,z),c in zip(pcd_3d.tolist(), colors.tolist()):
+            X = int(-x*800+600)
+            Y = int(-y*800+400)
+            cv2.circle(image, (Y,X), 3, c, -1)
 
         return image
 

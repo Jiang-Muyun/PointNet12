@@ -87,7 +87,7 @@ class SemKITTI_Loader(Dataset):
         if self.train:
             pcd = pcd_jitter(pcd)
 
-        length = pcd.shape[0]
+        # length = pcd.shape[0]
         # if length == self.npoints:
         #     pass
         # elif length > self.npoints:
@@ -100,6 +100,7 @@ class SemKITTI_Loader(Dataset):
         #     pcd = np.concatenate((pcd,pcd[0:rows_short]),axis=0)
         #     label = np.concatenate((label,label[0:rows_short]),axis=0)
 
+        length = pcd.shape[0]
         choice = np.random.choice(length, self.npoints, replace=True)
         pcd = pcd[choice]
         label = label[choice]
