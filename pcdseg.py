@@ -21,7 +21,7 @@ from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 from model.utils import load_pointnet
 
-from utils import mkdir, select_avaliable
+from pcd_utils import mkdir, select_avaliable
 from data_utils.SemKITTI_Loader import SemKITTI_Loader
 from data_utils.kitti_utils import Semantic_KITTI_Utils
 
@@ -140,10 +140,10 @@ def train(args):
     torch.backends.cudnn.benchmark = True
     model = torch.nn.DataParallel(model)
     model.cuda()
-    log.debug('Using gpu:',args.gpu)
+    log.info('Using gpu:',args.gpu)
     
     if args.pretrain is not None:
-        log.debug('Use pretrain model...')
+        log.info('Use pretrain model...')
         model.load_state_dict(torch.load(args.pretrain))
         init_epoch = int(args.pretrain[:-4].split('-')[-1])
         log.info('Restart training', epoch=init_epoch)
@@ -185,10 +185,10 @@ def train(args):
             loss.backward()
             optimizer.step()
         
-        log.debug('clear cuda cache')
         torch.cuda.empty_cache()
 
-        acc, miou = test_kitti_semseg(model.eval(), testdataloader,args.model_name,num_classes,class_names)
+        acc, miou = test_kitti_semseg(model.eval(), testdataloader,
+                                    args.model_name,num_classes,class_names)
 
         save_model = False
         if acc > best_acc:
