@@ -114,10 +114,12 @@ def train(args):
     log.info(subset=args.subset, train_npts=train_npts, test_npts=test_npts)
 
     dataset = SemKITTI_Loader(KITTI_ROOT, train_npts, train=True, subset=args.subset)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, 
+                            num_workers=args.workers, pin_memory=True)
     
     test_dataset = SemKITTI_Loader(KITTI_ROOT, test_npts, train=False, subset=args.subset)
-    testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, num_workers=args.workers)
+    testdataloader = DataLoader(test_dataset, batch_size=int(args.batch_size/2), shuffle=False, 
+                            num_workers=args.workers, pin_memory=True)
 
     if args.model_name == 'pointnet':
         model = PointNetSeg(num_classes, input_dims = 4, feature_transform=True)
