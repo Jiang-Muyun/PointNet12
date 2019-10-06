@@ -152,33 +152,41 @@ def train(args):
     best_miou = 0
 
     for epoch in range(init_epoch,args.epoch):
+        model.train()
         lr = calc_decay(args.learning_rate, epoch)
         log.info(subset=args.subset, model=args.model_name, gpu=args.gpu, epoch=epoch, lr=lr)
         
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
-        for points, target in tqdm(dataloader, total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
-            points = points.float().transpose(2, 1).cuda()
-            target = target.long().cuda()
+        loader = iter(dataloader)
+        while True:
+            with log.Tick():
+                try:
+                    with log.Tock('loader'):
+                        points, target = next(loader)
+                except StopIteration:
+                    break
+                #for points, target in tqdm(dataloader, total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
+                with log.Tock('net'):
+                    points = points.float().transpose(2, 1).cuda()
+                    target = target.long().cuda()
 
-            optimizer.zero_grad()
-            model = model.train()
-            
-            if args.model_name == 'pointnet':
-                pred, trans_feat = model(points)
-            else:
-                pred = model(points)
+                    if args.model_name == 'pointnet':
+                        pred, trans_feat = model(points)
+                    else:
+                        pred = model(points)
 
-            pred = pred.contiguous().view(-1, num_classes)
-            target = target.view(-1, 1)[:, 0]
-            loss = F.nll_loss(pred, target)
+                    pred = pred.contiguous().view(-1, num_classes)
+                    target = target.view(-1, 1)[:, 0]
+                    loss = F.nll_loss(pred, target)
 
-            if args.model_name == 'pointnet':
-                loss += feature_transform_reguliarzer(trans_feat) * 0.001
-
-            loss.backward()
-            optimizer.step()
+                    if args.model_name == 'pointnet':
+                        loss += feature_transform_reguliarzer(trans_feat) * 0.001
+                with log.Tock('opt'):
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
         
         log.debug('clear cuda cache')
         torch.cuda.empty_cache()
