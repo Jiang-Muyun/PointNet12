@@ -11,6 +11,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
+import torch.nn as nn
 
 from tqdm import tqdm
 from matplotlib import pyplot as plt
@@ -161,34 +162,28 @@ def train(args):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         
-        loader = iter(dataloader)
-        while True:
-            with log.Tick():
-                try:
-                    with log.Tock('loader'):
-                        points, target = next(loader)
-                except StopIteration:
-                    break
-                #for points, target in tqdm(dataloader, total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
-                with log.Tock('net'):
-                    points = points.float().transpose(2, 1).cuda()
-                    target = target.long().cuda()
+        for points, target in tqdm(dataloader, total=len(dataloader), smoothing=0.9, dynamic_ncols=True):
+            points = points.float().transpose(2, 1).cuda()
+            target = target.long().cuda()
 
-                    if args.model_name == 'pointnet':
-                        pred, trans_feat = model(points)
-                    else:
-                        pred = model(points)
+            if args.model_name == 'pointnet':
+                logits, trans_feat = model(points)
+            else:
+                logits = model(points)
 
-                    pred = pred.contiguous().view(-1, num_classes)
-                    target = target.view(-1, 1)[:, 0]
-                    loss = F.nll_loss(pred, target)
+            #logits = logits.contiguous().view(-1, num_classes)
+            #target = target.view(-1, 1)[:, 0]
+            #loss = F.nll_loss(logits, target)
 
-                    if args.model_name == 'pointnet':
-                        loss += feature_transform_reguliarzer(trans_feat) * 0.001
-                with log.Tock('opt'):
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
+            logits = logits.transpose(2, 1)
+            loss = nn.CrossEntropyLoss()(logits, target)
+
+            if args.model_name == 'pointnet':
+                loss += feature_transform_reguliarzer(trans_feat) * 0.001
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
         
         log.debug('clear cuda cache')
         torch.cuda.empty_cache()
