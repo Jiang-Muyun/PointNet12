@@ -8,7 +8,116 @@ from tqdm import tqdm
 import torch
 from PIL import Image
 
-sem_kitti_class_names = [#'unlabelled',
+class KITTI_2_Common():
+    def __init__(self, model):
+        self.model = model
+        self.common = None
+        self.kitti_names = ['road', 'sidewalk', 'building', 'wall', 'fence',
+            'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain',
+            'sky', 'person', 'rider', 'car', 'truck', 'bus', 'train',
+            'motorcycle', 'bicycle'
+        ]
+        self.kitti_2_common = [
+            'road','sidewalk','building+wall','fence','pole',
+            'traffic_light+traffic_sign','vegetation',
+            'terrain','person','rider','car','truck',
+            'bus+train','motorcycle','bicycle'
+        ]
+        self.kitti_colors = [
+            [128, 64, 128], [244, 35, 232], [70, 70, 70], [102, 102, 156],
+            [190, 153, 153], [153, 153, 153], [250, 170, 30],[220, 220, 0], [107, 142, 35],
+            [152, 251, 152], [0, 130, 180], [220, 20, 60], [255, 0, 0], [0, 0, 142],
+            [0, 0, 70], [0, 60, 100], [0, 80, 100], [0, 0, 230], [119, 11, 32]
+        ]
+        self.kitti_common_colors = []
+        for index, c_class in enumerate(self.kitti_2_common):
+            name_0 = c_class.split('+')[0]
+            index_0 = self.kitti_names.index(name_0)
+            self.kitti_common_colors.append(self.kitti_colors[index_0])
+        
+        self.kitti_colors = np.array(self.kitti_colors)
+        self.kitti_common_colors = np.array(self.kitti_common_colors)
+
+    def __call__(self, x):
+        logits = self.model(x)
+        new_size = list(logits.size())
+        new_size[1] = len(self.kitti_2_common)
+        self.common = torch.zeros(new_size, dtype=logits.dtype).cuda()
+        
+        for index, c_class in enumerate(self.kitti_2_common):
+            merge = c_class.split('+')
+            if len(merge) == 1:
+                index_0 = self.kitti_names.index(merge[0])
+                self.common[:, index] = logits[:,index_0]
+            elif len(merge) == 2:
+                index_0 = self.kitti_names.index(merge[0])
+                index_1 = self.kitti_names.index(merge[1])
+                self.common[:, index] = logits[:,[index_0,index_1]].max(1)[0]
+            else:
+                raise NotImplementedError("not implemented!")
+        return self.common
+
+
+class SemKITTI_2_Common():
+    def __init__(self, model, model_name):
+        self.model_name = model_name
+        self.model = model
+        self.common = None
+        self.semkitti_names = [
+            'car','bicycle','motorcycle','truck','other-vehicle',
+            'person','bicyclist','motorcyclist','road','parking','sidewalk','other-ground',
+            'building','fence','vegetation','trunk','terrain','pole','traffic-sign'
+        ]
+        self.semkitti_2_common = [
+            'road', 'parking+sidewalk', 'building','fence', 'trunk+pole',
+            'traffic-sign','vegetation','terrain','person','bicyclist+motorcyclist',
+            'car','truck','other-vehicle','motorcycle','bicycle',
+        ]
+        self.semkitti_colors = [
+            [245, 150, 100],[245, 230, 100],[150, 60, 30],[180, 30, 80],
+            [255, 0, 0],[30, 30, 255],[200, 40, 255],[90, 30, 150],[255, 0, 255],
+            [255, 150, 255], [75, 0, 75],[75, 0, 175],[0, 200, 255],[50, 120, 255],
+            [0, 175, 0],[0, 60, 135],[80, 240, 150],[150, 240, 255],[0, 0, 255]
+        ]
+
+        self.semkitti_common_colors = []
+        for index, c_class in enumerate(self.semkitti_2_common):
+            name_0 = c_class.split('+')[0]
+            index_0 = self.semkitti_names.index(name_0)
+            self.semkitti_common_colors.append(self.semkitti_colors[index_0])
+        
+        self.semkitti_colors = np.array(self.semkitti_colors)
+        self.semkitti_common_colors = np.array(self.semkitti_common_colors)
+
+    def __call__(self, x):
+        if self.model_name == 'pointnet':
+            logits, feature_transform = self.model(x)
+        else:
+            logits = self.model(x)
+
+        new_size = list(logits.size())
+        new_size[2] = len(self.semkitti_2_common)
+        self.common = torch.zeros(new_size, dtype=logits.dtype).cuda()
+
+        for index, c_class in enumerate(self.semkitti_2_common):
+            merge = c_class.split('+')
+            if len(merge) == 1:
+                index_0 = self.semkitti_names.index(merge[0])
+                self.common[:, :, index] = logits[:, :, index_0]
+            elif len(merge) == 2:
+                index_0 = self.semkitti_names.index(merge[0])
+                index_1 = self.semkitti_names.index(merge[1])
+                self.common[:, :, index] = logits[:, :, [index_0,index_1]].max(2)[0]
+            else:
+                raise NotImplementedError("not implemented!")
+        
+        if self.model_name == 'pointnet':
+            return self.common, feature_transform
+        else:
+            return self.common
+
+
+sem_kitti_class_names = [
     'car','bicycle','motorcycle','truck','other-vehicle',
     'person','bicyclist','motorcyclist','road','parking','sidewalk','other-ground',
     'building','fence','vegetation','trunk','terrain','pole','traffic-sign']
@@ -19,7 +128,7 @@ sem_kitti_colors = [[245, 150, 100],[245, 230, 100],[150, 60, 30],[180, 30, 80],
     [0, 175, 0],[0, 60, 135],[80, 240, 150],[150, 240, 255],[0, 0, 255]
 ]
 
-kitti_class_names = [#'unlabelled', 
+kitti_class_names = [
     'road', 'sidewalk', 'building', 'wall', 'fence',
     'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain','sky', 'person', 
     'rider', 'car', 'truck', 'bus', 'train','motorcycle', 'bicycle']
@@ -29,52 +138,7 @@ kitti_colors = [[128, 64, 128],[244, 35, 232],[70, 70, 70],[102, 102, 156],
     [152, 251, 152],[0, 130, 180],[220, 20, 60],[255, 0, 0],[0, 0, 142],
     [0, 0, 70],[0, 60, 100],[0, 80, 100],[0, 0, 230],[119, 11, 32]
 ]
-sem_kitti_to_slim = {
-    'car':          'car',
-    'bicycle':      'bicycle',
-    'motorcycle':   'motorcycle',
-    'truck':        'truck',
-    'other-vehicle':'train',
-    'person':       'person',
-    'bicyclist':    'rider',
-    'motorcyclist': 'rider',
-    'road':         'road',
-    'parking':      'ground',  # Not sure
-    'sidewalk':     'sidewalk',
-    'other-ground': 'ground',
-    'building':     'structure',
-    'fence':        'structure',
-    'vegetation':   'nature',
-    'trunk':        'nature',
-    'terrain':      'nature',
-    'pole':         'structure',
-    'traffic-sign': 'structure'
-}
 
-sem_kitti_to_kitti = {
-    'unlabelled':   'unlabelled', # 0
-    'car':          'vehicle',    # 1
-    'bicycle':      'vehicle',    # 2
-    'motorcycle':   'vehicle',    # 3
-    'truck':        'vehicle',    # 4
-    'other-vehicle':'vehicle',    # 5
-    'person':       'human',      # 6
-    'bicyclist':    'human',      # 7
-    'motorcyclist': 'human',      # 8
-    'road':         'ground',     # 9
-    'parking':      'ground',     # 10
-    'sidewalk':     'ground',     # 11
-    'other-ground': 'ground',     # 12
-    'building':     'structure',  # 13
-    'fence':        'structure',  # 14
-    'vegetation':   'nature',     # 15
-    'trunk':        'nature',     # 16  # Tree Stems
-    'terrain':      'nature',     # 17  # Grass Field
-    'pole':         'structure',  # 18
-    'traffic-sign': 'structure'   # 19
-}
-
-    
 class Semantic_KITTI_Utils():
     def __init__(self, root, subset = 'all'):
         self.root = root
@@ -115,24 +179,6 @@ class Semantic_KITTI_Utils():
 
         self.colors = np.array(sem_kitti_colors,np.uint8)
         self.colors_bgr = np.array([list(reversed(c)) for c in sem_kitti_colors],np.uint8)
-        
-        #colors = [[0, 0, 0],[245, 150, 100],[30, 30, 255],[255, 0, 255],[0, 200, 255],[0, 175, 0]]
-        #self.slim_colors = np.array(colors,np.uint8)
-        #self.slim_colors_bgr = np.array([list(reversed(c)) for c in colors],np.uint8)
-
-        # if self.map_type == 'slim':
-        #     num_classes = 6
-        #     slim_class_names = ['unlabelled', 'vehicle', 'human', 'ground', 'structure', 'nature']
-        #     self.index_to_name = {i:name for i,name in enumerate(slim_class_names)}
-        #     self.name_to_index = {name:i for i,name in enumerate(slim_class_names)}
-            
-        #     mapping_list = [slim_class_names.index(sem_kitti_to_slim[name]) for name in class_names]
-        #     self.slim_mapping = np.array(mapping_list,dtype=np.int32)
-
-        #     self.num_classes = num_classes
-        #     self.class_names = slim_class_names
-        #     self.colors = self.slim_colors
-        #     self.colors_bgr = self.slim_colors_bgr
 
     def get(self, part, index, load_image = False):
         
