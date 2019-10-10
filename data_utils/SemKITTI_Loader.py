@@ -37,6 +37,13 @@ def pcd_unnormalize(pcd):
     pcd[:,3] = pcd[:,3] / 2 + 0.5
     return pcd
 
+def pcd_tensor_unnorm(pcd):
+    pcd_unnorm = pcd.clone()
+    pcd_unnorm[:,0] = pcd[:,0] * 70
+    pcd_unnorm[:,1] = pcd[:,1] * 70
+    pcd_unnorm[:,2] = pcd[:,2] * 3
+    pcd_unnorm[:,3] = pcd[:,3] / 2 + 0.5
+    return pcd_unnorm
 
 class SemKITTI_Loader(Dataset):
     def __init__(self, root, npoints, train = True, subset = 'all'):
