@@ -21,7 +21,7 @@ class KITTI_2_Common():
             'road','sidewalk','building+wall','fence','pole',
             'traffic_light+traffic_sign','vegetation',
             'terrain','person','rider','car','truck',
-            'bus+train','motorcycle','bicycle'
+            'bus+train','motorcycle','bicycle','sky'
         ]
         self.kitti_colors = [
             [128, 64, 128], [244, 35, 232], [70, 70, 70], [102, 102, 156],
@@ -29,14 +29,14 @@ class KITTI_2_Common():
             [152, 251, 152], [0, 130, 180], [220, 20, 60], [255, 0, 0], [0, 0, 142],
             [0, 0, 70], [0, 60, 100], [0, 80, 100], [0, 0, 230], [119, 11, 32]
         ]
-        self.kitti_common_colors = []
+        self.colors = []
         for index, c_class in enumerate(self.kitti_2_common):
             name_0 = c_class.split('+')[0]
             index_0 = self.kitti_names.index(name_0)
-            self.kitti_common_colors.append(self.kitti_colors[index_0])
+            self.colors.append(self.kitti_colors[index_0])
         
         self.kitti_colors = np.array(self.kitti_colors)
-        self.kitti_common_colors = np.array(self.kitti_common_colors)
+        self.colors = np.array(self.colors)
 
     def __call__(self, x):
         logits = self.model(x)
@@ -64,14 +64,14 @@ class SemKITTI_2_Common():
         self.model = model
         self.common = None
         self.semkitti_names = [
-            'car','bicycle','motorcycle','truck','other-vehicle',
-            'person','bicyclist','motorcyclist','road','parking','sidewalk','other-ground',
-            'building','fence','vegetation','trunk','terrain','pole','traffic-sign'
+            'car', 'bicycle', 'motorcycle', 'truck', 'other-vehicle',
+            'person', 'bicyclist', 'motorcyclist', 'road', 'parking', 'sidewalk', 'other-ground',
+            'building', 'fence', 'vegetation', 'trunk', 'terrain','pole', 'traffic-sign'
         ]
         self.semkitti_2_common = [
-            'road', 'parking+sidewalk', 'building','fence', 'trunk+pole',
-            'traffic-sign','vegetation','terrain','person','bicyclist+motorcyclist',
-            'car','truck','other-vehicle','motorcycle','bicycle',
+            'road', 'parking+sidewalk', 'building', 'fence', 'trunk+pole',
+            'traffic-sign', 'vegetation', 'terrain', 'person', 'bicyclist+motorcyclist',
+            'car', 'truck', 'other-vehicle', 'motorcycle', 'bicycle','other-ground'
         ]
         self.semkitti_colors = [
             [245, 150, 100],[245, 230, 100],[150, 60, 30],[180, 30, 80],
@@ -80,14 +80,14 @@ class SemKITTI_2_Common():
             [0, 175, 0],[0, 60, 135],[80, 240, 150],[150, 240, 255],[0, 0, 255]
         ]
 
-        self.semkitti_common_colors = []
+        self.colors = []
         for index, c_class in enumerate(self.semkitti_2_common):
             name_0 = c_class.split('+')[0]
             index_0 = self.semkitti_names.index(name_0)
-            self.semkitti_common_colors.append(self.semkitti_colors[index_0])
+            self.colors.append(self.semkitti_colors[index_0])
         
         self.semkitti_colors = np.array(self.semkitti_colors)
-        self.semkitti_common_colors = np.array(self.semkitti_common_colors)
+        self.colors = np.array(self.colors)
 
     def __call__(self, x):
         if self.model_name == 'pointnet':
