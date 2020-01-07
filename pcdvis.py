@@ -22,7 +22,7 @@ from model.pointnet import PointNetSeg, feature_transform_reguliarzer
 from model.pointnet2 import PointNet2SemSeg
 from model.utils import load_pointnet
 
-from inview_seg import parse_args
+from pcdseg import parse_args
 from data_utils.SemKITTI_Loader import pcd_normalize
 from data_utils.kitti_utils import Semantic_KITTI_Utils
 
@@ -107,9 +107,9 @@ def vis(args):
 
     vis_handle = Window_Manager()
     if args.model_name == 'pointnet':
-        args.pretrain = 'checkpoints/pointnet-inview-learning-0.52692-0024.pth'
+        args.pretrain = 'checkpoints/pointnet-inview-0.52077-0018.pth'
     else:
-        args.pretrain = 'checkpoints/inview-pointnet2-learning-0.56718-0007.pth'
+        args.pretrain = 'checkpoints/pointnet2-inview-0.55884-0001.pth'
 
     model = load_pointnet(args.model_name, kitti_utils.num_classes, args.pretrain)
 
@@ -117,6 +117,7 @@ def vis(args):
         point_cloud, label = kitti_utils.get(part, index, load_image=True)
         
         # resample point cloud
+        length = point_cloud.shape[0]
         npoints = 25000
         choice = np.random.choice(length, npoints, replace=True)
         point_cloud = point_cloud[choice]
@@ -133,7 +134,7 @@ def vis(args):
                     logits, _ = model(points)
                 else:
                     logits = model(points)
-                    pred = logits[0].argmax(-1).cpu().numpy()
+                pred = logits[0].argmax(-1).cpu().numpy()
 
             print(index, pred.shape, end='')
 
