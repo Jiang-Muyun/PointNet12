@@ -28,7 +28,6 @@ from data_utils.kitti_utils import Semantic_KITTI_Utils
 
 KITTI_ROOT = os.environ['KITTI_ROOT']
 
-
 class Window_Manager():
     def __init__(self):
         self.param = open3d.io.read_pinhole_camera_parameters('config/ego_view.json')
@@ -44,7 +43,7 @@ class Window_Manager():
         self.vis.remove_geometry(self.pcd)
         self.vis.add_geometry(self.pcd)
         self.vis.get_view_control().convert_from_pinhole_camera_parameters(self.param)
-        self.vis.update_geometry()
+        self.vis.update_geometry(self.pcd)
         self.vis.poll_events()
         self.vis.update_renderer()
 
