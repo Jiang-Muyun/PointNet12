@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchvision.transforms as T
+# import torchvision.transforms as T
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
@@ -22,8 +22,13 @@ def load_pointnet(model_name, num_classes, fn_pth):
     model = torch.nn.DataParallel(model)
 
     assert fn_pth is not None,'No pretrain model'
-    checkpoint = torch.load(fn_pth)
+    if not torch.cuda.is_available():
+        print('=> cuda not available')
+        checkpoint = torch.load(fn_pth, map_location=torch.device('cpu'))
+    else:
+        checkpoint = torch.load(fn_pth)
+        model.cuda()
+    
     model.load_state_dict(checkpoint)
-    model.cuda()
     model.eval()
     return model

@@ -6,13 +6,14 @@ Links for Official Code:
 
 # Install
 ```bash
-conda install -c pytorch pytorch
+conda install -c pytorch pytorch=1.3.0 torchvision
 conda install -c open3d-admin open3d=0.9.0.0
-pip install h5py redis numpy pandas python-opencv
+pip install pyyaml matplotlib tqdm h5py redis numpy pandas opencv-python
 ```
 
 # Run demo
 ```bash
 export KITTI_ROOT=PATH/odometry/dataset
+# windows: $env:KITTI_ROOT = 'PATH/odometry/dataset'
 python pcdvis.py
 ```

@@ -7,7 +7,7 @@ import torch.nn.parallel
 import torch.nn as nn
 import torch.utils.data
 import torch.optim as optim
-import torchvision.transforms as T
+# import torchvision.transforms as T
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
