@@ -6,9 +6,11 @@ Links for Official Code:
 
 # Install
 ```bash
-conda install -c pytorch pytorch=1.3.0 torchvision
+conda create --name tf python=3.6
+conda activate tf
+conda install -c pytorch pytorch torchvision
 conda install -c open3d-admin open3d=0.9.0.0
-pip install pyyaml matplotlib tqdm h5py redis numpy pandas opencv-python
+pip install pyyaml matplotlib tqdm h5py redis numpy pandas opencv-python==4.2.0.32
 ```
 
 # Run demo
